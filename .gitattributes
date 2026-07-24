@@ -1,0 +1,23 @@
+# Godot text files — normalize to LF so Mac/Windows don't fight
+*.gd     text eol=lf
+*.tscn   text eol=lf
+*.tres   text eol=lf
+*.godot  text eol=lf
+*.import text eol=lf
+*.cfg    text eol=lf
+
+# 2D art & audio — binary, don't try to merge
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.wav  binary
+*.ogg  binary
+*.mp3  binary
+*.ttf  binary
+
+# --- If assets ever get big, switch to Git LFS (needs `git lfs install`
+#     on every machine, then uncomment these and remove the lines above) ---
+# *.png filter=lfs diff=lfs merge=lfs -text
+# *.wav filter=lfs diff=lfs merge=lfs -text
+# *.ogg filter=lfs diff=lfs merge=lfs -text

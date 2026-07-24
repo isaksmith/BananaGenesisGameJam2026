@@ -1,0 +1,22 @@
+# ---- Godot 4 .gitignore ----
+
+# Godot's per-machine import cache. NEVER commit this — it's rebuilt locally
+# on open and is the #1 source of pointless conflicts.
+.godot/
+
+# Export output
+/android/
+/builds/
+*.exe
+*.pck
+*.zip
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# We DO commit export_presets.cfg on purpose so whoever submits can export
+# with shared settings. If it starts causing conflicts, add it here.
+
+# Local Cursor MCP (machine-specific paths)
+.cursor/
