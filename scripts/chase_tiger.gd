@@ -2,7 +2,7 @@ extends Area2D
 
 ## Slow side-view chase predator for the jungle trail.
 
-const RUN_TEX := "res://assets/sprites/tiger/run.png"
+const RUN_TEX := "res://assets/sprites/tiger/run_orange.png"
 const RUN_FRAMES := 7
 const FRAME_SIZE := 32
 
@@ -38,11 +38,17 @@ func set_active(active: bool) -> void:
 
 func _build_visual() -> void:
 	_spr = Sprite2D.new()
-	_spr.texture = load(RUN_TEX) as Texture2D
+	# Load via Image so we bypass a stale .godot/imported cache.
+	var img := Image.load_from_file(ProjectSettings.globalize_path(RUN_TEX))
+	if img != null:
+		_spr.texture = ImageTexture.create_from_image(img)
+	else:
+		_spr.texture = load(RUN_TEX) as Texture2D
 	_spr.hframes = RUN_FRAMES
 	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_spr.scale = Vector2(2.2, 2.2)
+	_spr.scale = Vector2(2.6, 2.6)
 	_spr.offset = Vector2(0, -8)
+	_spr.modulate = Color(1.15, 0.85, 0.35, 1.0)
 	add_child(_spr)
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()

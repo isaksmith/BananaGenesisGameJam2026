@@ -1171,11 +1171,16 @@ func _physics_process(delta: float) -> void:
 
 	var scroll_cap := _finish_x - 200.0
 	if _scroll_x < scroll_cap:
-		_scroll_x += scroll_speed * delta
-		# If the cart outruns the trail pan, accelerate scroll so they aren't braked.
-		var catch_up := _wheel.global_position.x - 480.0
-		if catch_up > _scroll_x:
-			_scroll_x = minf(catch_up, scroll_cap)
+		var player_lead := _wheel.global_position.x - _scroll_x
+		var pan_speed := scroll_speed
+		if _wheel.velocity.x > scroll_speed and player_lead > 260.0:
+			# Blend up to the player's actual forward speed as they approach the
+			# right side. This preserves their world speed and their lead on a chase.
+			var follow_weight := smoothstep(260.0, 480.0, player_lead)
+			pan_speed = lerpf(scroll_speed, _wheel.velocity.x, follow_weight)
+		_scroll_x = minf(_scroll_x + pan_speed * delta, scroll_cap)
+		# Never let a fast frame put the player into the hard screen-edge clamp.
+		_scroll_x = maxf(_scroll_x, minf(_wheel.global_position.x - 500.0, scroll_cap))
 	var cam_y := lerpf(_camera.global_position.y, clampf(_wheel.global_position.y, 280.0, 480.0), 0.08)
 	_camera.global_position = Vector2(_scroll_x, cam_y)
 	if _snow:

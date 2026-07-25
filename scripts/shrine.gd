@@ -53,7 +53,12 @@ func _setup_art() -> void:
 	var path := icon_path
 	if path.is_empty():
 		path = ICONS.get(minigame_id, ICONS[&"chase"])
-	icon.texture = load(path) as Texture2D
+	if minigame_id == &"tiger_chase":
+		# Source images may change while Godot is running; bypass its stale import cache.
+		var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+		icon.texture = ImageTexture.create_from_image(image) if image != null else load(path) as Texture2D
+	else:
+		icon.texture = load(path) as Texture2D
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	pedestal.visible = true
 	pedestal.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
