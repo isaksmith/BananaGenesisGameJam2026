@@ -1,22 +1,13 @@
 extends Control
 
-const TRACK_ITEMS: Array[StringName] = [
-	&"banana", &"stick", &"rock", &"banana_peel",
-	&"fire_kit", &"square_wheel", &"banana_cart_frame",
-]
-
 @onready var objective_label: Label = %ObjectiveLabel
-@onready var inventory_row: HBoxContainer = %InventoryRow
 @onready var progress_row: HBoxContainer = %ProgressRow
-@onready var tip_label: Label = %TipLabel
 
 
 func _ready() -> void:
-	Inventory.inventory_changed.connect(_refresh_inventory)
 	GameProgress.progress_changed.connect(_refresh_progress)
 	GameProgress.mode_changed.connect(_on_mode_changed)
 	_build_progress_chips()
-	_refresh_inventory()
 	_refresh_progress()
 	_on_mode_changed(GameProgress.current_mode)
 
@@ -31,10 +22,10 @@ func _build_progress_chips() -> void:
 	for child in progress_row.get_children():
 		child.queue_free()
 	for era in [
-		{"id": &"fire", "label": "Fire", "icon": &"fire_kit"},
+		{"id": &"fire", "label": "Chef", "icon": &"fire_kit"},
 		{"id": &"wheel", "label": "Trails", "icon": &"square_wheel"},
-		{"id": &"cart", "label": "Cart", "icon": &"banana_cart_frame"},
-		{"id": &"chase", "label": "Raid", "icon": &"banana"},
+		{"id": &"cart", "label": "Maze", "icon": &"banana"},
+		{"id": &"chase", "label": "Defend", "icon": &"banana"},
 	]:
 		var chip := PanelContainer.new()
 		chip.name = str(era["id"])
@@ -56,34 +47,6 @@ func _build_progress_chips() -> void:
 		label.add_theme_constant_override("outline_size", 3)
 		row.add_child(label)
 		progress_row.add_child(chip)
-
-
-func _refresh_inventory() -> void:
-	for child in inventory_row.get_children():
-		child.queue_free()
-	var any := false
-	for item_id in TRACK_ITEMS:
-		var count := Inventory.get_count(item_id)
-		if count <= 0:
-			continue
-		any = true
-		var cell := HBoxContainer.new()
-		cell.add_theme_constant_override("separation", 4)
-		cell.add_child(UiIcons.make_icon(item_id, Vector2(28, 28)))
-		var label := Label.new()
-		label.text = "x%d" % count
-		label.add_theme_font_size_override("font_size", 16)
-		label.add_theme_color_override("font_outline_color", Color.BLACK)
-		label.add_theme_constant_override("outline_size", 4)
-		cell.add_child(label)
-		inventory_row.add_child(cell)
-	if not any:
-		var empty := Label.new()
-		empty.text = "Pockets empty — grab sticks, rocks, bananas"
-		empty.add_theme_font_size_override("font_size", 14)
-		empty.add_theme_color_override("font_outline_color", Color.BLACK)
-		empty.add_theme_constant_override("outline_size", 3)
-		inventory_row.add_child(empty)
 
 
 func _refresh_progress() -> void:

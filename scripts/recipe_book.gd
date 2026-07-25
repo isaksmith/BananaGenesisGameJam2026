@@ -7,6 +7,9 @@ var _open: bool = false
 @onready var inventory_list: VBoxContainer = %InventoryList
 @onready var toggle_hint: Label = %ToggleHint
 @onready var toggle_hint_panel: PanelContainer = $ToggleHintPanel
+@onready var sound_panel: PanelContainer = %SoundPanel
+@onready var sound_button: Button = %SoundButton
+@onready var settings_sound_button: Button = %SettingsSoundButton
 @onready var dim: ColorRect = %Dim
 
 
@@ -18,9 +21,27 @@ func _ready() -> void:
 	Inventory.inventory_changed.connect(_refresh)
 	Crafting.item_crafted.connect(_on_crafted)
 	GameProgress.mode_changed.connect(_on_mode_changed)
+	AudioSettings.sound_changed.connect(_refresh_sound_buttons)
+	if sound_button:
+		sound_button.pressed.connect(_on_sound_pressed)
+	if settings_sound_button:
+		settings_sound_button.pressed.connect(_on_sound_pressed)
 	_build_recipes()
 	_refresh()
+	_refresh_sound_buttons(AudioSettings.sound_enabled)
 	_on_mode_changed(GameProgress.current_mode)
+
+
+func _on_sound_pressed() -> void:
+	AudioSettings.toggle_sound()
+
+
+func _refresh_sound_buttons(_enabled: bool = true) -> void:
+	var label := "Sound: On" if AudioSettings.sound_enabled else "Sound: Off"
+	if sound_button:
+		sound_button.text = label
+	if settings_sound_button:
+		settings_sound_button.text = label
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -44,6 +65,9 @@ func _on_mode_changed(mode: StringName) -> void:
 	var in_hub_flow := mode == GameProgress.MODE_HUB or mode == GameProgress.MODE_FIRE \
 		or mode == GameProgress.MODE_WHEEL or mode == GameProgress.MODE_CART
 	toggle_hint_panel.visible = in_hub_flow
+	# Sound toggle stays available on hub/trails; hide on win/chase clutter.
+	if sound_panel:
+		sound_panel.visible = in_hub_flow
 	if mode == GameProgress.MODE_WIN or mode == GameProgress.MODE_CHASE:
 		_open = false
 		panel.visible = false

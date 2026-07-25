@@ -160,8 +160,8 @@ func _spawn_wheel() -> void:
 
 	var monkey := Sprite2D.new()
 	monkey.texture = load("res://assets/sprites/monkey_idle.png") as Texture2D
-	monkey.position = Vector2(0, -20)
-	monkey.scale = Vector2(0.55, 0.55)
+	monkey.position = Vector2(0, -28)
+	monkey.scale = Vector2(0.9, 0.9)
 	monkey.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_visual.add_child(monkey)
 

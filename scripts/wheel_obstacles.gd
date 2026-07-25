@@ -60,38 +60,96 @@ func _danger_modulate(color: Color) -> Color:
 	)
 
 
-func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4), long: bool = false, parent: Node = null) -> void:
+func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, _color: Color = Color.WHITE, long: bool = false, parent: Node = null) -> void:
 	var area := Area2D.new()
 	area.position = pos
 	area.collision_layer = 0
 	area.collision_mask = 1
 	area.monitoring = true
-	area.body_entered.connect(func(b: Node2D) -> void: _on_hazard.call(b))
 	var path := _spike_tex(long)
 	# Hitbox uses the compact scale; sprite is drawn larger for readability.
 	var hit_scale := 0.24 * scale
-	const VISUAL_BOOST := 1.7
+	# Metal spikes render extra large (hitbox below stays compact).
+	var visual_boost := 2.4 if use_metal_spikes else 1.7
 	var spr := _sprite(path, hit_scale, upside_down)
-	spr.modulate = _danger_modulate(color)
+	# Keep original wood/metal spike art — no red hazard tint.
+	spr.modulate = Color.WHITE
 	var tex := spr.texture
 	var h := float(tex.get_height()) * hit_scale if tex else 40.0
 	var w := float(tex.get_width()) * hit_scale if tex else 36.0
 	# Sit on ground / hang from ceiling (offset in texture px; scale applies after)
 	var tex_h := float(tex.get_height()) if tex else 40.0
 	spr.offset = Vector2(0, tex_h * 0.42 if upside_down else -tex_h * 0.42)
-	spr.scale = Vector2(hit_scale * VISUAL_BOOST, hit_scale * VISUAL_BOOST)
+	spr.scale = Vector2(hit_scale * visual_boost, hit_scale * visual_boost)
 	area.add_child(spr)
+	# Tip-only hitbox so grazing the sides doesn't count.
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(w * 0.7, h * 0.72)
+	shape.size = Vector2(w * 0.45, h * 0.32)
+	var tip_local_y := h * 0.42 if upside_down else -h * 0.48
 	col.shape = shape
-	col.position = Vector2(0, h * 0.22 if upside_down else -h * 0.28)
+	col.position = Vector2(0, tip_local_y)
 	area.add_child(col)
+	area.body_entered.connect(
+		func(b: Node2D) -> void: _on_spike_contact(b, upside_down, tip_local_y, area)
+	)
 	var host: Node = parent if parent != null else _host
 	host.add_child(area)
 
 
-func add_spike_row(origin: Vector2, count: int, spacing: float, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4), parent: Node = null) -> void:
+## Floor spikes kill only when landed on from above; ceiling spikes only when jumped into from below.
+func _on_spike_contact(body: Node2D, upside_down: bool, tip_local_y: float, area: Area2D) -> void:
+	if body == null or not is_instance_valid(area):
+		return
+	if not (body is CharacterBody2D):
+		_on_hazard.call(body)
+		return
+	var cb := body as CharacterBody2D
+	if _spike_should_kill(cb, upside_down, tip_local_y, area):
+		_on_hazard.call(body)
+		return
+	# Side-entered first, then landed on tips — keep watching briefly.
+	_spike_recheck(cb, upside_down, tip_local_y, area)
+
+
+func _spike_should_kill(cb: CharacterBody2D, upside_down: bool, tip_local_y: float, area: Area2D) -> bool:
+	if cb == null or not is_instance_valid(area):
+		return false
+	var tip_y := area.global_position.y + tip_local_y
+	if upside_down:
+		# Ceiling tips: only when rising into them.
+		if cb.velocity.y > 30.0:
+			return false
+		if cb.global_position.y > tip_y + 28.0:
+			return false
+		if cb.velocity.y >= -20.0 and not cb.is_on_ceiling():
+			return false
+		return true
+	# Floor tips: only when falling onto / standing on them.
+	if cb.velocity.y < -50.0:
+		return false
+	if cb.global_position.y > tip_y + 24.0:
+		return false
+	if absf(cb.velocity.x) > absf(cb.velocity.y) + 80.0 and cb.velocity.y < 40.0 and not cb.is_on_floor():
+		return false
+	return true
+
+
+func _spike_recheck(cb: CharacterBody2D, upside_down: bool, tip_local_y: float, area: Area2D) -> void:
+	if _host == null or not is_instance_valid(_host):
+		return
+	for _i in 20:
+		await _host.get_tree().create_timer(0.025).timeout
+		if not is_instance_valid(area) or not is_instance_valid(cb):
+			return
+		if not area.get_overlapping_bodies().has(cb):
+			return
+		if _spike_should_kill(cb, upside_down, tip_local_y, area):
+			_on_hazard.call(cb)
+			return
+
+
+func add_spike_row(origin: Vector2, count: int, spacing: float, upside_down: bool = false, scale: float = 1.0, color: Color = Color.WHITE, parent: Node = null) -> void:
 	# Place individual spikes evenly — long spikes for denser packs
 	var use_long := count >= 4
 	for i in count:
@@ -105,7 +163,6 @@ func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, col
 	area.collision_layer = 0
 	area.collision_mask = 1
 	area.monitoring = true
-	area.body_entered.connect(func(b: Node2D) -> void: _on_hazard.call(b))
 	# Hitbox uses the compact scale; sprite is drawn larger for readability.
 	var s := 0.62 * scale
 	const VISUAL_BOOST := 1.7
@@ -119,10 +176,19 @@ func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, col
 	area.add_child(spr)
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(frame_w * 0.7, frame_h * 0.6)
+	# Spike traps use a tip hitbox; fire/bear keep a fuller contact volume.
+	var tip_only := kind == &"spike"
+	shape.size = Vector2(frame_w * (0.5 if tip_only else 0.7), frame_h * (0.35 if tip_only else 0.6))
+	var tip_local_y := -frame_h * (0.48 if tip_only else 0.35)
 	col.shape = shape
-	col.position = Vector2(0, -frame_h * 0.35)
+	col.position = Vector2(0, tip_local_y)
 	area.add_child(col)
+	if tip_only:
+		area.body_entered.connect(
+			func(b: Node2D) -> void: _on_spike_contact(b, false, tip_local_y, area)
+		)
+	else:
+		area.body_entered.connect(func(b: Node2D) -> void: _on_hazard.call(b))
 	var host: Node = parent if parent != null else _host
 	host.add_child(area)
 	var fps := float(info["fps"])

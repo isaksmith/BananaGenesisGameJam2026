@@ -3,6 +3,20 @@ extends Node2D
 ## Themed Mario-style course. Drawn wheel size/roundness changes what you can clear.
 
 const WheelObstaclesScript := preload("res://scripts/wheel_obstacles.gd")
+const LEVEL_MUSIC := "res://assets/audio/Swing_Through_the_Canopy.mp3"
+const SFX_JUMP := "res://assets/audio/sfx/sfx_jump.ogg"
+const SFX_DIE := "res://assets/audio/sfx/sfx_hurt.ogg"
+const TRAIL_MUSIC := {
+	&"gap_gorge": "res://assets/audio/trails/gap-gorge-song-1.mp3",
+	&"needle_pass": "res://assets/audio/trails/needle-pass-song-1.mp3",
+	&"wobble_ridge": "res://assets/audio/trails/wobble-ridge-song-1.mp3",
+	&"sprint_delta": "res://assets/audio/trails/spring-delta-song.mp3",
+	&"frost_fjord": "res://assets/audio/trails/frosted-fjord-song1.mp3",
+	&"moon_graveyard": "res://assets/audio/trails/moon-graveyard-song.mp3",
+	&"desert_sky": "res://assets/audio/trails/desert-sky-song.mp3",
+	&"lunar_void": "res://assets/audio/trails/lunar-void-song.mp3",
+	&"tiger_chase": "res://assets/audio/trails/tiger-trail-song.mp3",
+}
 
 @export var move_speed: float = 340.0
 @export var move_accel: float = 1600.0
@@ -41,6 +55,9 @@ var _floor_y: float = 520.0
 ## Registered ground / floating pads — hazards snap to these surfaces.
 var _platforms: Array[Dictionary] = []
 var _tiger: Area2D = null
+var _tumbleweeds_enabled: bool = false
+var _tumble_spawn_t: float = 0.0
+var _tumble_spawn_cd: float = 2.8
 
 const ROCK_VARIANTS := [
 	"res://assets/sprites/rock_small.png",
@@ -64,18 +81,35 @@ func _ready() -> void:
 	_spawn_finish()
 	if bool(_level.get("chase_tiger", false)):
 		_spawn_chase_tiger()
+	_tumbleweeds_enabled = _theme == &"desert" or bool(_level.get("tumbleweeds", false))
+	if _tumbleweeds_enabled:
+		_tumble_spawn_t = 1.2
+		_tumble_spawn_cd = float(_level.get("tumbleweed_interval", 2.8))
 	_build_camera()
 	_build_ui()
 	var title := str(_level.get("title", "Trail"))
 	var tip := "pads launch · spikes kill"
 	if bool(_level.get("chase_tiger", false)):
 		tip = "tiger chases — don't get caught · spikes kill"
+	elif _tumbleweeds_enabled:
+		tip = "tumbleweeds roll across ledges and fall into gaps — jump them · spikes kill"
 	_hint.text = "%s · %s\n%s\nArrows · Space · Esc/Q · R" % [
 		title,
 		tip,
 		GameProgress.wheel_fit_note(),
 	]
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_play_level_music()
+
+
+func _play_level_music() -> void:
+	# Replaces hub music (which kept playing during wheel design).
+	var music_path := str(TRAIL_MUSIC.get(GameProgress.selected_wheel_level, LEVEL_MUSIC))
+	AudioSettings.play_music(music_path)
+
+
+func _play_sfx(path: String, volume_db: float = 0.0) -> void:
+	GameAudio.play(self, path, false, volume_db)
 
 
 func _apply_level_tuning() -> void:
@@ -92,6 +126,7 @@ func _apply_level_tuning() -> void:
 	_effective_jump = jump_impulse * lerpf(1.0 - penalty, 1.0 + boost, size)
 	# Round wheels jump a bit cleaner on wobble ridge
 	_effective_jump *= lerpf(0.9, 1.08, roundness) if _bumpy > 0.5 else 1.0
+	_effective_jump *= float(_level.get("jump_scale", 1.0))
 	var accel_f := float(_level.get("accel_size_factor", 0.3))
 	# Smaller wheels → snappier accel (helps sprint delta)
 	_effective_accel = move_accel * lerpf(1.0 + accel_f, 1.0 - accel_f * 0.35, size)
@@ -138,18 +173,23 @@ func _build_world() -> void:
 	var stretch_min := float(_level.get("stretch_min", 420.0))
 	var stretch_max := float(_level.get("stretch_max", 720.0))
 
+	# Leave a solid finish runway so every lane can always roll through the line.
+	var finish_runway_start := course_length - 520.0
 	var x := 0.0
-	while x < course_length:
+	while x < finish_runway_start:
 		var stretch := rng.randf_range(stretch_min, stretch_max)
-		if x + stretch > course_length:
-			stretch = course_length - x
-		_add_ground(x, 560.0, stretch, 80.0)
+		if x + stretch > finish_runway_start:
+			stretch = finish_runway_start - x
+		# Tall textured foundation: top at y=520, extends well past the screen bottom.
+		_add_ground(x, 740.0, stretch, 440.0)
 		x += stretch
-		if x < course_length - 200.0:
+		if x < finish_runway_start - 200.0:
 			x += rng.randf_range(gap_min, gap_max)
+	# Guaranteed ground under / past the finish line.
+	_add_ground(finish_runway_start, 740.0, course_length - finish_runway_start + 400.0, 440.0)
 
-	# Three runnable levels: low stepping pads, mid lane, high lane (floor stretches = ground).
-	# Vertical gaps (~120px+) leave room for the compact cart to jump between lanes.
+	# Three runnable levels: low / mid / high pads (floor stretches = ground).
+	# Vertical gaps (~150px+) leave room for the cart to pass between lanes.
 	var lane_ys: Array = [
 		float(_level.get("lane_low_y", 455.0)),
 		float(_level.get("lane_mid_y", 335.0)),
@@ -157,12 +197,27 @@ func _build_world() -> void:
 	]
 	var spacing := float(_level.get("platform_spacing", 540.0))
 	var platform_count := int(_level.get("platform_count", 36))
-	for i in platform_count:
-		var px := 420.0 + float(i) * spacing + rng.randf_range(-50, 70)
-		if px > course_length - 200.0:
-			break
-		var py: float = float(lane_ys[i % 3]) + rng.randf_range(-12.0, 12.0)
-		_add_ground(px, py, rng.randf_range(120.0, 200.0), 24.0)
+	var pattern := StringName(_level.get("pattern", &"gorge"))
+	if pattern == &"sprint":
+		# Explicit three-lane columns: low / mid / high with room to pass between.
+		var columns := maxi(platform_count / 3, 8)
+		for i in columns:
+			var px := 420.0 + float(i) * spacing + rng.randf_range(-20.0, 30.0)
+			if px > course_length - 200.0:
+				break
+			for lane_i in 3:
+				# Slight X stagger so stacked lanes don't read as one thick block.
+				var ox := float(lane_i - 1) * 36.0
+				var py: float = float(lane_ys[lane_i])
+				_add_ground(px + ox, py, rng.randf_range(130.0, 190.0), 22.0)
+	else:
+		for i in platform_count:
+			var px := 420.0 + float(i) * spacing + rng.randf_range(-50, 70)
+			if px > course_length - 200.0:
+				break
+			var lane_i := i % 3
+			var py: float = float(lane_ys[lane_i]) + rng.randf_range(-10.0, 10.0)
+			_add_ground(px, py, rng.randf_range(120.0, 200.0), 24.0)
 
 	# Ceiling / overhang rocks are SOLID only — bonking your head must not explode the cart.
 	# Keep them above the high lane so mid/low stay passable.
@@ -173,51 +228,99 @@ func _build_world() -> void:
 		var px := 700.0 + i * (course_length / float(maxi(ceiling_count, 1)))
 		if px > course_length - 300.0:
 			break
-		if winter or _theme == &"lunar":
-			_add_snow_prop(Vector2(px, rng.randf_range(cy0, cy1)), "res://assets/sprites/toffee/ice_rock.png", 0.55)
-		elif _theme == &"graveyard":
-			_add_snow_prop(Vector2(px, rng.randf_range(cy0, cy1)), "res://assets/sprites/moon_graveyard/Salt.png", 0.45)
-		else:
-			_add_rock(Vector2(px, rng.randf_range(cy0, cy1)), false, 5)
+		var rock_pos := Vector2(px, rng.randf_range(cy0, cy1))
+		var rock := _add_theme_floating_rock(rock_pos, i)
+		_add_hover(rock, rng.randf_range(6.0, 12.0), rng.randf_range(1.9, 3.1), rng.randf())
 
 	match _theme:
 		&"winter":
 			_spawn_winter_trees()
 		&"graveyard":
 			_spawn_graveyard_decor(rng)
-		&"desert", &"lunar":
+		&"desert":
+			_spawn_desert_tumbleweed_props(rng)
+		&"lunar":
 			pass
 		_:
 			_spawn_toffee_track_decor(rng)
 
 
+const BG_COVER_H := 1100.0
+const BG_CENTER_Y := 360.0
+
+
+func _scale_backdrop_sprite(spr: Sprite2D, tex: Texture2D) -> void:
+	# Overscan past 720 so vertical camera pan never shows empty bands.
+	var s := BG_COVER_H / maxf(float(tex.get_height()), 1.0)
+	spr.scale = Vector2(s, s)
+
+
 func _build_forest_platform_backdrop() -> void:
-	# Parallax forest pillars from ForestPlatform pack.
-	var far := load("res://assets/sprites/forest_platform/bg_layer_0.png") as Texture2D
-	var mid := load("res://assets/sprites/forest_platform/bg_layer_1.png") as Texture2D
-	var near := load("res://assets/sprites/forest_platform/bg_wide.png") as Texture2D
-	for i in 10:
-		var layer_far := Sprite2D.new()
-		layer_far.z_index = -16
-		layer_far.texture = far
-		layer_far.position = Vector2(i * 1800.0, 360)
-		layer_far.modulate = Color(1, 1, 1, 0.55)
-		layer_far.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_far)
-		var layer_mid := Sprite2D.new()
-		layer_mid.z_index = -15
-		layer_mid.texture = mid if mid != null else near
-		layer_mid.position = Vector2(i * 1800.0 + 200.0, 360)
-		layer_mid.modulate = Color(1, 1, 1, 0.75)
-		layer_mid.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_mid)
-		var layer_near := Sprite2D.new()
-		layer_near.z_index = -14
-		layer_near.texture = near
-		layer_near.position = Vector2(i * 1800.0, 360)
-		layer_near.modulate = Color(1, 1, 1, 0.9)
-		layer_near.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_near)
+	# ForestPlatform bg layers are mid-trunk crops (flat tops). Build a real canopy
+	# parallax from full tree sprites instead.
+	var sky := load("res://assets/sprites/forest/sky.png") as Texture2D
+	if sky != null:
+		var spacing := 1800.0 * (BG_COVER_H / 720.0)
+		for i in 10:
+			var layer := Sprite2D.new()
+			layer.z_index = -18
+			layer.texture = sky
+			_scale_backdrop_sprite(layer, sky)
+			layer.position = Vector2(float(i) * spacing, BG_CENTER_Y)
+			layer.modulate = Color(1, 1, 1, 0.85)
+			layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(layer)
+
+	var far_trees: Array[String] = [
+		"res://assets/sprites/forest/single_tree_0.png",
+		"res://assets/sprites/forest/single_tree_1.png",
+		"res://assets/sprites/forest_tree_0.png",
+		"res://assets/sprites/forest_tree_1.png",
+	]
+	var near_trees: Array[String] = [
+		"res://assets/sprites/forest/single_tree_0.png",
+		"res://assets/sprites/forest/single_tree_1.png",
+		"res://assets/sprites/forest/single_tree_2.png",
+		"res://assets/sprites/forest_tree.png",
+		"res://assets/sprites/forest_tree_2.png",
+		"res://assets/sprites/forest_tree_3.png",
+	]
+	_spawn_forest_canopy_row(far_trees, -16, 140.0, 0.95, 1.35, Color(0.35, 0.45, 0.4, 0.55), 560.0)
+	_spawn_forest_canopy_row(near_trees, -14, 105.0, 1.15, 1.75, Color(0.55, 0.7, 0.5, 0.78), 575.0)
+
+
+func _spawn_forest_canopy_row(
+	paths: Array[String],
+	z: int,
+	spacing: float,
+	scale_min: float,
+	scale_max: float,
+	tint: Color,
+	ground_y: float
+) -> void:
+	var course := float(_level.get("course_length", 7800.0))
+	var x := -80.0
+	var i := 0
+	while x < course + 400.0:
+		var path: String = paths[i % paths.size()]
+		var tex := load(path) as Texture2D
+		if tex != null:
+			var spr := Sprite2D.new()
+			spr.z_index = z
+			spr.texture = tex
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.centered = true
+			var s := lerpf(scale_min, scale_max, float((i * 37) % 10) / 9.0)
+			spr.scale = Vector2(s, s)
+			# Plant at the trunk base so the full canopy stays on-screen.
+			var half_h := float(tex.get_height()) * s * 0.5
+			spr.position = Vector2(x, ground_y - half_h)
+			spr.modulate = tint
+			if i % 2 == 0:
+				spr.flip_h = true
+			add_child(spr)
+		x += spacing + float((i * 17) % 40)
+		i += 1
 
 
 func _build_graveyard_backdrop() -> void:
@@ -225,23 +328,23 @@ func _build_graveyard_backdrop() -> void:
 	var mid := load("res://assets/sprites/moon_graveyard/Background_1.png") as Texture2D
 	var grass := load("res://assets/sprites/moon_graveyard/Grass_background_1.png") as Texture2D
 	var grass2 := load("res://assets/sprites/moon_graveyard/Grass_background_2.png") as Texture2D
-	for i in 12:
-		var x := float(i) * 760.0
+	for i in 16:
 		for pair in [
-			[far, -18, 0.55, Color(1, 1, 1, 0.9)],
-			[mid, -17, 0.7, Color(1, 1, 1, 0.85)],
-			[grass, -16, 0.85, Color(1, 1, 1, 0.9)],
-			[grass2, -15, 0.95, Color(1, 1, 1, 0.95)],
+			[far, -18, 1100.0, 0.0, Color(1, 1, 1, 0.95)],
+			[mid, -17, 1100.0, 160.0, Color(1, 1, 1, 0.88)],
+			[grass, -16, 640.0, 40.0, Color(1, 1, 1, 0.92)],
+			[grass2, -15, 640.0, 340.0, Color(1, 1, 1, 0.95)],
 		]:
 			var tex: Texture2D = pair[0]
 			if tex == null:
 				continue
+			var spacing: float = float(pair[2])
 			var spr := Sprite2D.new()
 			spr.z_index = int(pair[1])
 			spr.texture = tex
-			spr.position = Vector2(x + 100.0 * float(pair[2]), 360)
-			spr.scale = Vector2(1.05, 1.05)
-			spr.modulate = pair[3]
+			_scale_backdrop_sprite(spr, tex)
+			spr.position = Vector2(float(i) * spacing + float(pair[3]), BG_CENTER_Y)
+			spr.modulate = pair[4]
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(spr)
 
@@ -251,17 +354,17 @@ func _build_parallax_backdrop(folder: String, files: Array, alphas: Array, spaci
 		var tex := load(folder + String(files[layer_i])) as Texture2D
 		if tex == null:
 			continue
-		var spacing: float = float(spacings[layer_i]) if layer_i < spacings.size() else 2000.0
+		var base_spacing: float = float(spacings[layer_i]) if layer_i < spacings.size() else 2000.0
+		# Keep horizontal coverage after vertical overscan scaling.
+		var spacing := base_spacing * (BG_COVER_H / 720.0)
 		var alpha: float = float(alphas[layer_i]) if layer_i < alphas.size() else 0.8
 		var tiles := maxi(6, int(ceil((course_length + 1600.0) / spacing)) + 1)
 		for i in tiles:
 			var spr := Sprite2D.new()
 			spr.z_index = -18 + layer_i
 			spr.texture = tex
-			# Fit ~720px tall view while keeping pixel look
-			var s := 720.0 / maxf(float(tex.get_height()), 1.0)
-			spr.scale = Vector2(s, s)
-			spr.position = Vector2(float(i) * spacing, 360)
+			_scale_backdrop_sprite(spr, tex)
+			spr.position = Vector2(float(i) * spacing, BG_CENTER_Y)
 			spr.modulate = Color(1, 1, 1, alpha)
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(spr)
@@ -277,15 +380,7 @@ func _tile_graveyard_platform(body: Node2D, width: float, height: float) -> void
 	var y_off := -hy + 2.0 if height < 40.0 else -hy - float(tex.get_height()) * 0.1
 	_tile_cap_row(body, tex, width, y_off)
 	if height >= 40.0:
-		var fill := Polygon2D.new()
-		var hx := width * 0.5
-		fill.color = Color(0.22, 0.21, 0.2, 1)
-		fill.polygon = PackedVector2Array([
-			Vector2(-hx + 4, -hy + 8), Vector2(hx - 4, -hy + 8),
-			Vector2(hx - 4, hy), Vector2(-hx + 4, hy)
-		])
-		fill.z_index = -1
-		body.add_child(fill)
+		_tile_ground_fill(body, width, height)
 
 
 func _tile_desert_platform(body: Node2D, width: float, height: float) -> void:
@@ -297,17 +392,68 @@ func _tile_desert_platform(body: Node2D, width: float, height: float) -> void:
 
 
 func _spawn_graveyard_decor(rng: RandomNumberGenerator) -> void:
-	var props := [
-		"res://assets/sprites/moon_graveyard/Salt.png",
-		"res://assets/sprites/moon_graveyard/brush.png",
-	]
-	for i in 18:
-		var px := 500.0 + float(i) * 420.0 + rng.randf_range(-40, 80)
-		if px > course_length - 250.0:
-			break
-		var path: String = props[i % props.size()]
-		var s := 0.35 if path.ends_with("brush.png") else 0.5
-		_add_snow_prop(Vector2(px, rng.randf_range(470.0, 520.0)), path, s)
+	# Sit statues / brush on platform tops — never free-float in midair.
+	var plats := _platforms.duplicate()
+	if plats.is_empty():
+		return
+	plats.shuffle()
+	var count := mini(18, plats.size())
+	for i in count:
+		var p: Dictionary = plats[i]
+		var t := rng.randf_range(0.18, 0.82)
+		# Keep clear of platform edges so feet stay on the stone.
+		t = clampf(t, 0.2, 0.8)
+		var on_top := _plat_point(p, t, false)
+		if i % 3 == 0:
+			_add_platform_prop(
+				on_top,
+				"res://assets/sprites/moon_graveyard/Salt.png",
+				0.42,
+				Rect2()
+			)
+		else:
+			# brush.png is a 2-row sheet — use one bush variant only.
+			var row := 0 if i % 2 == 0 else 1
+			_add_platform_prop(
+				on_top,
+				"res://assets/sprites/moon_graveyard/brush.png",
+				0.55,
+				Rect2(0, row * 96, 224, 96)
+			)
+
+
+func _add_platform_prop(feet: Vector2, tex_path: String, scale: float, region: Rect2 = Rect2()) -> void:
+	var tex := load(tex_path) as Texture2D
+	if tex == null:
+		return
+	var body := StaticBody2D.new()
+	body.position = feet
+	body.collision_layer = 4
+	body.collision_mask = 0
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.scale = Vector2(scale, scale)
+	var tex_h := float(tex.get_height())
+	var tex_w := float(tex.get_width())
+	if region.size != Vector2.ZERO:
+		sprite.region_enabled = true
+		sprite.region_rect = region
+		tex_w = region.size.x
+		tex_h = region.size.y
+	# Anchor the visual bottom on the platform top.
+	sprite.offset = Vector2(0, -tex_h * 0.5)
+	body.add_child(sprite)
+	var col := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	var tw := tex_w * scale
+	var th := tex_h * scale
+	shape.size = Vector2(tw * 0.55, th * 0.45)
+	col.shape = shape
+	col.position = Vector2(0, -th * 0.35)
+	body.add_child(col)
+	add_child(body)
 
 
 ## Tile a cap texture across a platform, cropping the final tile so the art
@@ -345,17 +491,8 @@ func _tile_forest_platform(body: Node2D, width: float, height: float) -> void:
 	if height < 40.0:
 		y_off = -hy + 2.0
 	_tile_cap_row(body, tex, width, y_off)
-	# Soft dirt fill under the grass cap so tall ground segments still read.
 	if height >= 40.0:
-		var fill := Polygon2D.new()
-		var hx := width * 0.5
-		fill.color = Color(_ground_color.r * 0.85, _ground_color.g * 0.75, _ground_color.b * 0.55, 1)
-		fill.polygon = PackedVector2Array([
-			Vector2(-hx + 4, -hy + 8), Vector2(hx - 4, -hy + 8),
-			Vector2(hx - 4, hy), Vector2(-hx + 4, hy)
-		])
-		fill.z_index = -1
-		body.add_child(fill)
+		_tile_ground_fill(body, width, height)
 
 
 func _build_winter_backdrop() -> void:
@@ -363,28 +500,37 @@ func _build_winter_backdrop() -> void:
 	var far := load("res://assets/sprites/ice_platform/bg_layer_0.png") as Texture2D
 	var mid := load("res://assets/sprites/ice_platform/bg_layer_1.png") as Texture2D
 	var near := load("res://assets/sprites/ice_platform/bg_wide.png") as Texture2D
-	for i in 10:
-		var layer_far := Sprite2D.new()
-		layer_far.z_index = -16
-		layer_far.texture = far if far != null else near
-		layer_far.position = Vector2(i * 1800.0, 360)
-		layer_far.modulate = Color(1, 1, 1, 0.65)
-		layer_far.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_far)
-		var layer_mid := Sprite2D.new()
-		layer_mid.z_index = -15
-		layer_mid.texture = mid if mid != null else near
-		layer_mid.position = Vector2(i * 1800.0 + 160.0, 360)
-		layer_mid.modulate = Color(1, 1, 1, 0.8)
-		layer_mid.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_mid)
-		var layer_near := Sprite2D.new()
-		layer_near.z_index = -14
-		layer_near.texture = near
-		layer_near.position = Vector2(i * 1800.0, 360)
-		layer_near.modulate = Color(1, 1, 1, 0.95)
-		layer_near.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(layer_near)
+	var spacing := 1800.0 * (BG_COVER_H / 720.0)
+	for i in 12:
+		if far != null or near != null:
+			var layer_far := Sprite2D.new()
+			layer_far.z_index = -16
+			var far_tex: Texture2D = far if far != null else near
+			layer_far.texture = far_tex
+			_scale_backdrop_sprite(layer_far, far_tex)
+			layer_far.position = Vector2(float(i) * spacing, BG_CENTER_Y)
+			layer_far.modulate = Color(1, 1, 1, 0.65)
+			layer_far.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(layer_far)
+		var mid_tex: Texture2D = mid if mid != null else near
+		if mid_tex != null:
+			var layer_mid := Sprite2D.new()
+			layer_mid.z_index = -15
+			layer_mid.texture = mid_tex
+			_scale_backdrop_sprite(layer_mid, mid_tex)
+			layer_mid.position = Vector2(float(i) * spacing + 160.0, BG_CENTER_Y)
+			layer_mid.modulate = Color(1, 1, 1, 0.8)
+			layer_mid.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(layer_mid)
+		if near != null:
+			var layer_near := Sprite2D.new()
+			layer_near.z_index = -14
+			layer_near.texture = near
+			_scale_backdrop_sprite(layer_near, near)
+			layer_near.position = Vector2(float(i) * spacing, BG_CENTER_Y)
+			layer_near.modulate = Color(1, 1, 1, 0.95)
+			layer_near.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(layer_near)
 
 	# Distant ice pillars for depth.
 	var pillar := load("res://assets/sprites/ice_platform/pillar_0.png") as Texture2D
@@ -403,6 +549,9 @@ func _build_winter_backdrop() -> void:
 
 
 func _spawn_winter_trees() -> void:
+	# Trees stay readable scenery. Ice cubes / pillars / rocks reuse the same
+	# platform tiles as landable pads, so at full opacity they look solid —
+	# keep those as faded background silhouettes only.
 	var pines := [
 		"res://assets/sprites/ice_platform/tree_0.png",
 		"res://assets/sprites/ice_platform/pillar_1.png",
@@ -412,16 +561,27 @@ func _spawn_winter_trees() -> void:
 	]
 	for i in 48:
 		var tree := Sprite2D.new()
-		tree.z_index = -5
 		tree.texture = load(pines[i % pines.size()]) as Texture2D
 		tree.position = Vector2(160 + i * 180.0, 470)
 		var path_str := str(pines[i % pines.size()])
-		var s := 1.45 if "pillar" in path_str else 1.25
+		var is_block := "cube" in path_str or "pillar" in path_str or "ice_rock" in path_str
+		var s := 1.25
+		if "pillar" in path_str:
+			s = 1.45
 		if "cube" in path_str:
 			s = 1.6
 			tree.position.y = 520
+		elif "ice_rock" in path_str:
+			s = 1.15
+			tree.position.y = 500
 		tree.scale = Vector2(s, s)
 		tree.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		if is_block:
+			tree.z_index = -9
+			tree.modulate = Color(0.82, 0.9, 1.0, 0.32)
+		else:
+			tree.z_index = -5
+			tree.modulate = Color(1, 1, 1, 0.92)
 		if i % 2 == 0:
 			tree.flip_h = true
 		add_child(tree)
@@ -448,37 +608,57 @@ func _spawn_toffee_track_decor(rng: RandomNumberGenerator) -> void:
 				"res://assets/sprites/toffee/bush_coral_orange.png",
 			]
 		&"sprint":
+			# Distant silhouettes only — full bright tree icons read as UI stickers.
 			trees = [
-				"res://assets/sprites/toffee/tree_pine.png",
-				"res://assets/sprites/toffee/tree_pine_warm.png",
-				"res://assets/sprites/forest_platform/trunk_0.png",
-			]
-		&"gorge":
-			trees = [
+				"res://assets/sprites/toffee/fern.png",
 				"res://assets/sprites/toffee/rock_grey.png",
 				"res://assets/sprites/toffee/rock_brown.png",
-				"res://assets/sprites/forest_platform/trunk_1.png",
-				"res://assets/sprites/toffee/cactus.png",
+				"res://assets/sprites/forest_platform/trunk_2.png",
+			]
+		&"gorge":
+			# Full canopy trees — forest_platform trunks are top-less mid cuts.
+			trees = [
+				"res://assets/sprites/forest/single_tree_0.png",
+				"res://assets/sprites/forest/single_tree_1.png",
+				"res://assets/sprites/forest_tree_1.png",
+				"res://assets/sprites/toffee/tree_pine_warm.png",
+				"res://assets/sprites/toffee/tree_birch.png",
 			]
 	for i in 40:
 		var prop := Sprite2D.new()
 		prop.z_index = -5
-		prop.texture = load(trees[i % trees.size()]) as Texture2D
-		prop.position = Vector2(200 + i * 220.0, 480)
 		var path_str := str(trees[i % trees.size()])
+		var tex := load(path_str) as Texture2D
+		prop.texture = tex
+		prop.position = Vector2(200 + i * 220.0, 480)
 		var s := 1.05
 		if "trunk" in path_str:
 			s = 1.4
 			prop.position.y = 430
+		elif pattern == &"gorge":
+			s = 1.35 if "single_tree" in path_str or "forest_tree" in path_str else 1.15
+			if tex != null:
+				prop.position.y = 555.0 - float(tex.get_height()) * s * 0.5
+			prop.z_index = -6
 		elif pattern == &"chaos":
 			s = 1.35
+		elif pattern == &"sprint":
+			s = 0.85 if "fern" in path_str else 0.7
+			if "trunk" in path_str:
+				s = 1.1
+				prop.position.y = 500
+			prop.z_index = -8
 		prop.scale = Vector2(s, s)
-		prop.modulate = Color(1, 1, 1, 0.92)
+		if pattern == &"sprint":
+			# Push props into the background as muted silhouettes.
+			prop.modulate = Color(0.28, 0.36, 0.3, 0.45)
+		else:
+			prop.modulate = Color(1, 1, 1, 0.92)
 		prop.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		if i % 2 == 0:
 			prop.flip_h = true
 		add_child(prop)
-		if pattern == &"gorge" or pattern == &"sprint":
+		if pattern == &"gorge":
 			if i % 3 == 0:
 				var rock := Sprite2D.new()
 				rock.z_index = -4
@@ -520,10 +700,12 @@ func _add_ground(x: float, y: float, width: float, height: float) -> void:
 	var visual := Polygon2D.new()
 	var hx := width * 0.5
 	var hy := height * 0.5
-	visual.color = _ground_color
+	# Dark underlay; tall bottom blocks get a real tile fill on top of this.
+	visual.color = Color(_ground_color.r * 0.45, _ground_color.g * 0.4, _ground_color.b * 0.35, 1)
 	visual.polygon = PackedVector2Array([
 		Vector2(-hx, -hy), Vector2(hx, -hy), Vector2(hx, hy), Vector2(-hx, hy)
 	])
+	visual.z_index = -2
 	body.add_child(visual)
 
 	if _theme == &"winter" or _icy > 0.4:
@@ -596,18 +778,153 @@ func _tile_snow_caps(body: Node2D, width: float, height: float) -> void:
 		y_off = -hy + 2.0
 	_tile_cap_row(body, tex, width, y_off)
 	if height >= 40.0:
-		var fill := Polygon2D.new()
-		var hx := width * 0.5
-		fill.color = Color(0.55, 0.72, 0.88, 1)
-		fill.polygon = PackedVector2Array([
-			Vector2(-hx + 4, -hy + 8), Vector2(hx - 4, -hy + 8),
-			Vector2(hx - 4, hy), Vector2(-hx + 4, hy)
-		])
-		fill.z_index = -1
-		body.add_child(fill)
+		_tile_ground_fill(body, width, height)
 
 
-func _add_rock(pos: Vector2, deadly: bool = false, variant: int = -1) -> void:
+func _tile_ground_fill(body: Node2D, width: float, height: float) -> void:
+	## Textured foundation under the grass/snow/stone caps (bottom runway block).
+	var path := "res://assets/sprites/ground_dirt_fill.png"
+	var tint := Color(1, 1, 1, 1)
+	match _theme:
+		&"winter":
+			path = "res://assets/sprites/ice_platform/cube_1.png"
+			tint = Color(0.92, 0.97, 1.0, 1)
+		&"graveyard":
+			path = "res://assets/sprites/toffee/rock_grey.png"
+			tint = Color(0.75, 0.72, 0.7, 1)
+		&"lunar":
+			path = "res://assets/sprites/toffee/rock_grey_b.png"
+			tint = Color(0.7, 0.72, 0.85, 1)
+		&"desert":
+			path = "res://assets/sprites/ground_dirt_fill.png"
+			tint = Color(1.2, 1.0, 0.72, 1)
+		_:
+			path = "res://assets/sprites/ground_dirt_fill.png"
+			tint = Color(1.0, 0.95, 0.85, 1)
+	var tex := load(path) as Texture2D
+	if tex == null:
+		return
+	_tile_fill_grid(body, width, height, tex, tint)
+
+
+func _tile_fill_grid(body: Node2D, width: float, height: float, tex: Texture2D, tint: Color) -> void:
+	var tile_w := float(tex.get_width())
+	var tile_h := float(tex.get_height())
+	if tile_w < 1.0 or tile_h < 1.0:
+		return
+	# Scale so a few rows cover the tall bottom block without looking tiny.
+	var s := clampf(height / (tile_h * 2.4), 0.85, 2.2)
+	var step_x := tile_w * s
+	var step_y := tile_h * s
+	var left := -width * 0.5
+	var top := -height * 0.5 + 6.0
+	var bottom := height * 0.5
+	var y := top
+	while y < bottom - 0.5:
+		var row_h := minf(step_y, bottom - y)
+		var x := left
+		while x < left + width - 0.5:
+			var cell_w := minf(step_x, left + width - x)
+			var spr := Sprite2D.new()
+			spr.texture = tex
+			spr.modulate = tint
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			spr.z_index = -1
+			if cell_w < step_x - 0.5 or row_h < step_y - 0.5:
+				spr.region_enabled = true
+				var rw := tile_w * (cell_w / step_x)
+				var rh := tile_h * (row_h / step_y)
+				spr.region_rect = Rect2(0, 0, rw, rh)
+				spr.scale = Vector2(s, s)
+				spr.position = Vector2(x + cell_w * 0.5, y + row_h * 0.5)
+			else:
+				spr.scale = Vector2(s, s)
+				spr.position = Vector2(x + step_x * 0.5, y + step_y * 0.5)
+			body.add_child(spr)
+			x += step_x
+		y += step_y
+
+
+## Gentle vertical bob for floating props. Returns immediately for null nodes.
+func _add_hover(node: Node2D, amplitude: float = 8.0, period: float = 2.4, phase: float = 0.0) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	var base_y := node.position.y
+	var tw := create_tween()
+	tw.set_loops()
+	tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Phase offset keeps a row of rocks from bobbing in lockstep.
+	if phase > 0.01:
+		tw.tween_interval(period * phase * 0.5)
+	tw.tween_property(node, "position:y", base_y - amplitude, period * 0.5)
+	tw.tween_property(node, "position:y", base_y, period * 0.5)
+
+
+## karsiori Rock Pile 8 BIG — colors matched to trail themes.
+func _theme_floating_rock_paths() -> Array[String]:
+	match _theme:
+		&"winter":
+			return [
+				"res://assets/sprites/rock_piles/pile8_white.png",
+				"res://assets/sprites/rock_piles/pile8_azure.png",
+			]
+		&"desert":
+			return [
+				"res://assets/sprites/rock_piles/pile8_beige.png",
+				"res://assets/sprites/rock_piles/pile8_orange.png",
+			]
+		&"graveyard":
+			return [
+				"res://assets/sprites/rock_piles/pile8_silver.png",
+				"res://assets/sprites/rock_piles/pile8_white.png",
+			]
+		&"lunar":
+			return [
+				"res://assets/sprites/rock_piles/pile8_azure.png",
+				"res://assets/sprites/rock_piles/pile8_silver.png",
+			]
+		_:
+			# Forest / tiger jungle trails
+			return [
+				"res://assets/sprites/rock_piles/pile8_mossy.png",
+				"res://assets/sprites/rock_piles/pile8_beige.png",
+			]
+
+
+func _add_theme_floating_rock(pos: Vector2, variant: int = 0) -> Node2D:
+	var paths := _theme_floating_rock_paths()
+	var path := paths[variant % paths.size()]
+	var body := StaticBody2D.new()
+	body.position = pos
+	body.collision_layer = 4
+	var tex := load(path) as Texture2D
+	if tex == null:
+		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if img != null:
+			tex = ImageTexture.create_from_image(img)
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = true
+	# Pile 8 is 60x40 — scale up so it reads as a floating boulder.
+	var scale := 2.2
+	sprite.scale = Vector2(scale, scale)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	if tex:
+		sprite.offset = Vector2(0, -float(tex.get_height()) * 0.35)
+	body.add_child(sprite)
+	var col := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	var tw := float(tex.get_width()) * scale if tex else 120.0
+	var th := float(tex.get_height()) * scale if tex else 80.0
+	shape.size = Vector2(tw * 0.7, th * 0.5)
+	col.shape = shape
+	col.position = Vector2(0, -th * 0.2)
+	body.add_child(col)
+	add_child(body)
+	return body
+
+
+func _add_rock(pos: Vector2, deadly: bool = false, variant: int = -1) -> Node2D:
 	if _icy > 0.4:
 		var snow_paths := [
 			"res://assets/sprites/ice_platform/cube_1.png",
@@ -616,8 +933,7 @@ func _add_rock(pos: Vector2, deadly: bool = false, variant: int = -1) -> void:
 			"res://assets/sprites/toffee/ice_rock.png",
 		]
 		var idx := variant if variant >= 0 else int(absf(pos.x))
-		_add_snow_prop(pos, snow_paths[idx % snow_paths.size()], 1.35)
-		return
+		return _add_snow_prop(pos, snow_paths[idx % snow_paths.size()], 1.35)
 
 	var body: CollisionObject2D
 	if deadly:
@@ -653,9 +969,10 @@ func _add_rock(pos: Vector2, deadly: bool = false, variant: int = -1) -> void:
 	col.position = Vector2(0, -th * 0.28)
 	body.add_child(col)
 	add_child(body)
+	return body
 
 
-func _add_snow_prop(pos: Vector2, tex_path: String, scale: float = 1.4) -> void:
+func _add_snow_prop(pos: Vector2, tex_path: String, scale: float = 1.4) -> Node2D:
 	var body := StaticBody2D.new()
 	body.position = pos
 	body.collision_layer = 4
@@ -676,6 +993,7 @@ func _add_snow_prop(pos: Vector2, tex_path: String, scale: float = 1.4) -> void:
 	col.position = Vector2(0, -th * 0.2)
 	body.add_child(col)
 	add_child(body)
+	return body
 
 
 func _spawn_wheel() -> void:
@@ -701,30 +1019,46 @@ func _spawn_wheel() -> void:
 	_visual.name = "Visual"
 	_wheel.add_child(_visual)
 
-	# Slightly wider axle so tires sit under the bigger cart body
+	# Banana chassis: wheels bolted underneath, monkey riding on top.
 	var visual_spread := clampf(radius * 0.72, 14.0, 24.0)
 	var poly := GameProgress.get_drawn_wheel()
+
+	# Top of the drawn tire, so the banana can rest right on the axle line.
+	var poly_min_y := 0.0
+	for p in poly:
+		poly_min_y = minf(poly_min_y, p.y)
+	var wheel_top := _axle_y + poly_min_y * wheel_vis
+
 	_wheel_l = _make_drawn_wheel_visual(poly, Vector2(-visual_spread, _axle_y))
 	_wheel_r = _make_drawn_wheel_visual(poly, Vector2(visual_spread, _axle_y))
 	_wheel_l.scale = Vector2(wheel_vis, wheel_vis)
 	_wheel_r.scale = Vector2(wheel_vis, wheel_vis)
+	_wheel_l.z_index = 0
+	_wheel_r.z_index = 0
 	_visual.add_child(_wheel_l)
 	_visual.add_child(_wheel_r)
 
 	var cart := Sprite2D.new()
-	cart.texture = load("res://assets/sprites/banana_cart.png") as Texture2D
-	cart.position = Vector2(0, _axle_y - radius * 0.1 - 6.0)
-	var cart_scale_y := clampf(0.16 + radius / 300.0, 0.18, 0.28)
-	var cart_scale_x := cart_scale_y * 0.62
-	cart.scale = Vector2(cart_scale_x, cart_scale_y)
+	cart.name = "BananaBody"
+	cart.texture = load("res://assets/sprites/banana.png") as Texture2D
+	var cart_scale := clampf(1.05 + radius / 180.0, 1.15, 1.65)
+	# Flip so the stem points left / tip leads right (forward).
+	cart.scale = Vector2(-cart_scale, cart_scale * 0.92)
 	cart.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# banana.png art occupies y 7..57 of a 64px canvas → 25px half-height.
+	var banana_half := 25.0 * absf(cart.scale.y)
+	cart.position = Vector2(0, wheel_top + 8.0 - banana_half)
 	cart.z_index = 1
 	_visual.add_child(cart)
 
 	var monkey := Sprite2D.new()
 	monkey.texture = load("res://assets/sprites/monkey_idle.png") as Texture2D
-	monkey.position = Vector2(1, cart.position.y - 14.0)
-	monkey.scale = Vector2(0.36, 0.36)
+	# Visual-only size boost — collision stays compact (body_w / body_h above).
+	monkey.scale = Vector2(1.05, 1.05)
+	# monkey_idle art sits low in its canvas: content bottom is +48px from origin.
+	# Place feet just into the banana's top curve so the monkey reads as seated.
+	var banana_top := cart.position.y - banana_half
+	monkey.position = Vector2(2, banana_top + 42.0 - 48.0 * monkey.scale.y)
 	monkey.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	monkey.z_index = 2
 	_visual.add_child(monkey)
@@ -742,18 +1076,106 @@ func _spawn_wheel() -> void:
 func _make_drawn_wheel_visual(poly: PackedVector2Array, offset: Vector2) -> Node2D:
 	var hub := Node2D.new()
 	hub.position = offset
+	if poly.size() < 3:
+		return hub
+
+	# Dark "tire tread" underlay — slightly inflated so it reads as a rim.
+	var tread := Polygon2D.new()
+	tread.z_index = -1
+	tread.color = Color(0.14, 0.1, 0.07, 1)
+	tread.polygon = _inflate_poly(poly, 3.2)
+	hub.add_child(tread)
+
+	# Wood-plank wheel face.
 	var fill := Polygon2D.new()
-	fill.color = Color(0.85, 0.62, 0.22)
+	fill.color = Color(1.0, 0.92, 0.78, 1)
 	fill.polygon = poly
+	var wood := load("res://assets/sprites/wood_planks.png") as Texture2D
+	if wood == null:
+		wood = load("res://assets/sprites/ui_wood.png") as Texture2D
+	if wood != null:
+		fill.texture = wood
+		fill.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		fill.uv = _poly_uvs(poly, wood.get_size())
+	else:
+		fill.color = Color(0.72, 0.5, 0.26, 1)
 	hub.add_child(fill)
+
+	# Inner wood grain ring (carved rim).
+	var rim := Line2D.new()
+	rim.width = 4.5
+	rim.default_color = Color(0.38, 0.22, 0.1, 0.95)
+	rim.closed = true
+	rim.joint_mode = Line2D.LINE_JOINT_ROUND
+	rim.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	rim.end_cap_mode = Line2D.LINE_CAP_ROUND
+	for p in poly:
+		rim.add_point(p)
+	hub.add_child(rim)
+
+	# Outer tire edge.
 	var outline := Line2D.new()
-	outline.width = 3.0
-	outline.default_color = Color(0.25, 0.15, 0.08)
+	outline.width = 2.4
+	outline.default_color = Color(0.08, 0.05, 0.03, 1)
 	outline.closed = true
 	for p in poly:
 		outline.add_point(p)
 	hub.add_child(outline)
+
+	# Axle hub — nails the "wooden wheel" look.
+	var axle_dark := Polygon2D.new()
+	axle_dark.color = Color(0.22, 0.12, 0.06, 1)
+	axle_dark.polygon = _circle_poly(7.5, 12)
+	hub.add_child(axle_dark)
+	var axle := Polygon2D.new()
+	axle.color = Color(0.55, 0.36, 0.16, 1)
+	axle.polygon = _circle_poly(4.5, 12)
+	hub.add_child(axle)
 	return hub
+
+
+func _inflate_poly(poly: PackedVector2Array, amount: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var n := poly.size()
+	if n < 3:
+		return poly
+	var c := Vector2.ZERO
+	for p in poly:
+		c += p
+	c /= float(n)
+	for p in poly:
+		var d := p - c
+		if d.length_squared() < 0.001:
+			out.append(p)
+		else:
+			out.append(c + d.normalized() * (d.length() + amount))
+	return out
+
+
+func _poly_uvs(poly: PackedVector2Array, tex_size: Vector2) -> PackedVector2Array:
+	var min_v := poly[0]
+	var max_v := poly[0]
+	for p in poly:
+		min_v = min_v.min(p)
+		max_v = max_v.max(p)
+	var size := (max_v - min_v)
+	size.x = maxf(size.x, 1.0)
+	size.y = maxf(size.y, 1.0)
+	var uvs := PackedVector2Array()
+	# Tile the plank texture across the wheel face.
+	var tile := Vector2(maxf(tex_size.x, 1.0), maxf(tex_size.y, 1.0)) * 0.55
+	for p in poly:
+		var n := (p - min_v) / size
+		uvs.append(n * tile)
+	return uvs
+
+
+func _circle_poly(radius: float, segments: int = 12) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in segments:
+		var a := TAU * float(i) / float(segments)
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	return pts
 
 
 func _spawn_pickups_and_hazards() -> void:
@@ -867,19 +1289,17 @@ func _pattern_chaos() -> void:
 			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.9, Color(0.9, 0.35, 0.2))
 		else:
 			_obs.add_spike(_plat_point(p, 0.5), false, 0.9, Color(0.9, 0.35, 0.2))
-		# Movers between mid/high — spikes ride with them
+		# Movers between mid/high — safe rideable platforms (no spikes attached).
 		if i % 4 == 0 and i + 1 < airs.size():
 			var a: Dictionary = airs[i]
 			var b: Dictionary = airs[i + 1]
-			var mover: Node2D = _obs.add_moving_platform(
+			_obs.add_moving_platform(
 				_plat_point(a, 0.5),
 				_plat_point(b, 0.5),
 				120.0,
 				2.0 + float(i % 3) * 0.35,
 				Color(0.55, 0.4, 0.22)
 			)
-			_obs.add_spike(Vector2(0, -14), false, 0.85, Color(0.9, 0.35, 0.2), false, mover)
-			_obs.add_spike(Vector2(0, 14), true, 0.85, Color(0.9, 0.35, 0.2), false, mover)
 
 
 func _pattern_sprint() -> void:
@@ -927,17 +1347,17 @@ func _pattern_frost() -> void:
 			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.95, Color(1.15, 0.35, 0.55))
 		elif i % 3 == 1:
 			_obs.add_spike(_plat_point(p, 0.5), false, 0.95, Color(1.15, 0.35, 0.55))
+		# Movers stay rideable — never attach spikes/traps to them.
 		if i % 5 == 0 and i + 1 < airs.size():
 			var a: Dictionary = airs[i]
 			var b: Dictionary = airs[mini(i + 2, airs.size() - 1)]
-			var mover: Node2D = _obs.add_moving_platform(
+			_obs.add_moving_platform(
 				_plat_point(a, 0.5),
 				_plat_point(b, 0.5),
 				110.0,
-				2.6,
+				4.2,
 				Color(0.75, 0.88, 0.98)
 			)
-			_obs.add_trap(Vector2(0, -12), &"spike", 1.2, Color(0.8, 0.92, 1.1), mover)
 
 
 func _pattern_grave() -> void:
@@ -973,7 +1393,7 @@ func _pattern_desert() -> void:
 		var p: Dictionary = grounds[i]
 		match i % 3:
 			0:
-				_obs.add_jump_pad(_plat_point(p, 0.45) + Vector2(0, -2), 820.0, Color(1.15, 0.85, 0.35))
+				_obs.add_jump_pad(_plat_point(p, 0.45) + Vector2(0, -2), 640.0, Color(1.15, 0.85, 0.35))
 			1:
 				_obs.add_spike(_plat_point(p, 0.55), false, 1.0, Color(1.2, 0.45, 0.25))
 			2:
@@ -1036,35 +1456,135 @@ func _spawn_chase_tiger() -> void:
 	_tiger.call("setup", _wheel, _on_hazard, speed)
 
 
+func _spawn_desert_tumbleweed_props(rng: RandomNumberGenerator) -> void:
+	## Static tumbleweeds along the dunes for flavor.
+	var tex := load("res://assets/sprites/hazards/tumbleweed.png") as Texture2D
+	if tex == null:
+		return
+	var grounds := _plats_ground()
+	for i in grounds.size():
+		if i % 4 != 0:
+			continue
+		var p: Dictionary = grounds[i]
+		var spr := Sprite2D.new()
+		spr.texture = tex
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var s := rng.randf_range(0.7, 1.0)
+		spr.scale = Vector2(s, s)
+		spr.modulate = Color(0.95, 0.85, 0.65, 0.9)
+		spr.rotation = rng.randf_range(-0.4, 0.4)
+		spr.z_index = 1
+		# Sit slightly above the sand top so they read as on the ground, not sunk in.
+		spr.position = _plat_point(p, rng.randf_range(0.15, 0.85)) + Vector2(0, -14)
+		add_child(spr)
+
+
+func _clear_tumbleweeds() -> void:
+	for n in get_tree().get_nodes_in_group("tumbleweed"):
+		if is_instance_valid(n):
+			n.queue_free()
+
+
+func _spawn_rolling_tumbleweed() -> void:
+	if _camera == null:
+		return
+	var script: Script = load("res://scripts/tumbleweed.gd") as Script
+	var weed := CharacterBody2D.new()
+	weed.set_script(script)
+	var speed := float(_level.get("tumbleweed_speed", 68.0)) * randf_range(0.85, 1.15)
+	var scale_mul := randf_range(0.75, 1.05)
+	weed.global_position = _pick_tumbleweed_spawn()
+	add_child(weed)
+	weed.call("setup", _on_hazard, speed, scale_mul)
+
+
+func _pick_tumbleweed_spawn() -> Vector2:
+	## Prefer a platform under the right side of the camera at any lane height.
+	var x_min := _scroll_x + 420.0
+	var x_max := _scroll_x + 780.0
+	var candidates: Array[Dictionary] = []
+	for p in _platforms:
+		var left := float(p["left"])
+		var right := float(p["right"])
+		if right < x_min or left > x_max:
+			continue
+		# Need a little runway so they can roll before falling.
+		if float(p["w"]) < 70.0:
+			continue
+		candidates.append(p)
+
+	if candidates.is_empty():
+		# Fallback: drop in from the right and let gravity find a ledge.
+		return Vector2(_scroll_x + 720.0, float(_level.get("lane_mid_y", 335.0)))
+
+	var plat: Dictionary = candidates[randi() % candidates.size()]
+	var left := float(plat["left"])
+	var right := float(plat["right"])
+	# Bias toward the right edge so they enter from off-screen / far right.
+	var t := randf_range(0.55, 0.95)
+	var x := lerpf(left + 18.0, right - 14.0, t)
+	x = clampf(x, left + 14.0, right - 10.0)
+	var top := float(plat["top"])
+	return Vector2(x, top - 10.0)
+
+
 func _spawn_finish() -> void:
-	_finish_x = course_length - 200.0
+	# Place finish where the camera can still pan to it, with room to drive through.
+	_finish_x = course_length - 320.0
 	var finish := Area2D.new()
-	finish.position = Vector2(_finish_x, 420)
+	finish.name = "FinishLine"
+	finish.position = Vector2(_finish_x, 360)
 	finish.collision_layer = 0
 	finish.collision_mask = 1
 	finish.monitoring = true
+	finish.monitorable = false
 	finish.body_entered.connect(_on_finish)
+
+	# Full-height yellow strip (covers every lane / camera pan).
 	var banner := Polygon2D.new()
-	banner.color = Color(1, 0.85, 0.2, 0.55)
+	banner.z_index = 8
+	banner.color = Color(1.0, 0.88, 0.2, 0.62)
 	banner.polygon = PackedVector2Array([
-		Vector2(-20, -200), Vector2(20, -200), Vector2(20, 200), Vector2(-20, 200)
+		Vector2(-14, -520), Vector2(14, -520), Vector2(14, 520), Vector2(-14, 520)
 	])
 	finish.add_child(banner)
+	# Bright edge lines so it reads as a checkered finish pole.
+	var edge_l := Line2D.new()
+	edge_l.z_index = 9
+	edge_l.width = 3.0
+	edge_l.default_color = Color(1.0, 0.95, 0.45, 0.95)
+	edge_l.add_point(Vector2(-14, -520))
+	edge_l.add_point(Vector2(-14, 520))
+	finish.add_child(edge_l)
+	var edge_r := Line2D.new()
+	edge_r.z_index = 9
+	edge_r.width = 3.0
+	edge_r.default_color = Color(1.0, 0.75, 0.15, 0.95)
+	edge_r.add_point(Vector2(14, -520))
+	edge_r.add_point(Vector2(14, 520))
+	finish.add_child(edge_r)
+
 	var pile := Sprite2D.new()
 	pile.texture = load("res://assets/sprites/bananas_pile.png") as Texture2D
-	pile.scale = Vector2(2.2, 2.2)
+	pile.position = Vector2(48, 40)
+	pile.scale = Vector2(2.0, 2.0)
+	pile.z_index = 10
 	pile.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	finish.add_child(pile)
 	var label := Label.new()
 	label.text = "FINISH"
-	label.position = Vector2(-40, -230)
-	label.add_theme_font_size_override("font_size", 22)
+	label.position = Vector2(-48, -280)
+	label.z_index = 10
+	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_color_override("font_color", Color(1, 0.95, 0.4, 1))
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 5)
 	finish.add_child(label)
+
+	# Tall trigger — any lane crossing the line counts.
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(80, 400)
+	shape.size = Vector2(64, 1100)
 	col.shape = shape
 	finish.add_child(col)
 	add_child(finish)
@@ -1143,6 +1663,7 @@ func _physics_process(delta: float) -> void:
 		_wheel.velocity.y += gravity * delta
 	elif Input.is_action_just_pressed("jump") or Input.is_action_just_pressed("move_up"):
 		_wheel.velocity.y = -_effective_jump
+		_play_sfx(SFX_JUMP, -4.0)
 		GameProgress.juice_shake.emit(0.05)
 
 	# Jagged wheels bounce / skid on bumpy trails
@@ -1169,7 +1690,8 @@ func _physics_process(delta: float) -> void:
 	if _wheel_r:
 		_wheel_r.rotation = spin
 
-	var scroll_cap := _finish_x - 200.0
+	# Keep finish on-screen and always driveable: scroll can follow past the line.
+	var scroll_cap := _finish_x + 120.0
 	if _scroll_x < scroll_cap:
 		var player_lead := _wheel.global_position.x - _scroll_x
 		var pan_speed := scroll_speed
@@ -1186,11 +1708,17 @@ func _physics_process(delta: float) -> void:
 	if _snow:
 		_snow.global_position = Vector2(_scroll_x, cam_y - 380.0)
 
-	var right_limit := _scroll_x + 560.0
+	if _tumbleweeds_enabled:
+		_tumble_spawn_t -= delta
+		if _tumble_spawn_t <= 0.0:
+			_spawn_rolling_tumbleweed()
+			_tumble_spawn_t = _tumble_spawn_cd * randf_range(0.75, 1.35)
+
+	# Soft right rail — always past the finish so the player can cross it.
+	var right_limit := maxf(_scroll_x + 560.0, _finish_x + 80.0)
 	if _wheel.global_position.x > right_limit:
 		_wheel.global_position.x = right_limit
-		# Only kill forward speed at the hard end of the course (scroll already capped).
-		if _scroll_x >= scroll_cap - 0.5:
+		if _scroll_x >= scroll_cap - 0.5 and _wheel.global_position.x > _finish_x + 40.0:
 			_wheel.velocity.x = minf(_wheel.velocity.x, 0.0)
 
 	var left_kill := _scroll_x - 660.0
@@ -1221,11 +1749,12 @@ func _on_jump_pad(body: Node2D, boost: float) -> void:
 	if body != _wheel and not body.is_in_group("player"):
 		return
 	_wheel.velocity.y = -boost
+	_play_sfx(SFX_JUMP, -2.0)
 	GameProgress.juice_shake.emit(0.08)
 
 
 func _on_hazard(body: Node2D) -> void:
-	# Spikes / saws only — never used for platform underside bonks.
+	# Spikes / saws / tumbleweeds — never used for platform underside bonks.
 	if _done or _dead:
 		return
 	if body == _wheel or body.is_in_group("player"):
@@ -1234,6 +1763,10 @@ func _on_hazard(body: Node2D) -> void:
 			var near_tiger := _wheel.global_position.distance_to(_tiger.global_position) < 70.0
 			if near_tiger:
 				_respawn("The tiger got you! Keep moving — it never stops.")
+				return
+		for n in get_tree().get_nodes_in_group("tumbleweed"):
+			if is_instance_valid(n) and _wheel.global_position.distance_to(n.global_position) < 80.0:
+				_respawn("Tumbleweed! Jump over — they roll off ledges and into gaps.")
 				return
 		_respawn("Spike / trap! Redesign the wheel if this trail hates your shape.")
 
@@ -1249,8 +1782,10 @@ func _respawn(msg: String) -> void:
 	_hint.text = msg
 	var boom_at := _wheel.global_position
 	_wheel.velocity = Vector2.ZERO
+	_play_sfx(SFX_DIE, -2.0)
 	if _tiger != null and is_instance_valid(_tiger):
 		_tiger.call("set_active", false)
+	_clear_tumbleweeds()
 	if _visual:
 		_visual.visible = false
 	_spawn_banana_explosion(boom_at)
@@ -1261,6 +1796,7 @@ func _respawn(msg: String) -> void:
 	_wheel.global_position = _spawn
 	_wheel.velocity = Vector2.ZERO
 	_roll_dist = 0.0
+	_tumble_spawn_t = 1.6
 	if _tiger != null and is_instance_valid(_tiger):
 		_tiger.global_position = _spawn + Vector2(-220.0, 20.0)
 		_tiger.call("set_active", true)

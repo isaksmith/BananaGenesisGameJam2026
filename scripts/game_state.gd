@@ -1,13 +1,13 @@
 extends Node
 
-## Chase-only round state. Inactive during hub / other minigames.
+## Chase / defense round HUD state. Arena scripts drive the values.
 
 signal score_changed(score: int)
 signal time_changed(time_left: float)
 signal round_ended(final_score: int)
 signal round_started
 
-const ROUND_TIME := 45.0
+const ROUND_TIME := 30.0
 
 var score: int = 0
 var time_left: float = ROUND_TIME
@@ -21,13 +21,9 @@ func set_active(active: bool) -> void:
 		is_playing = false
 
 
-func _process(delta: float) -> void:
-	if not is_active or not is_playing:
-		return
-	time_left = maxf(time_left - delta, 0.0)
-	time_changed.emit(time_left)
-	if time_left <= 0.0:
-		end_round()
+func _process(_delta: float) -> void:
+	# Timer is owned by chase_arena — this autoload only stores HUD state.
+	pass
 
 
 func add_score(amount: int = 1) -> void:
@@ -38,13 +34,10 @@ func add_score(amount: int = 1) -> void:
 
 
 func start_round() -> void:
+	# Kept for compatibility; chase_arena starts itself in _ready.
 	if not is_active:
 		return
-	score = 0
-	time_left = ROUND_TIME
 	is_playing = true
-	score_changed.emit(score)
-	time_changed.emit(time_left)
 	round_started.emit()
 
 
@@ -52,8 +45,4 @@ func end_round() -> void:
 	if not is_playing:
 		return
 	is_playing = false
-	time_left = 0.0
-	time_changed.emit(time_left)
 	round_ended.emit(score)
-	# Finale: chase ends the campaign.
-	GameProgress.report_chase_finished(score)

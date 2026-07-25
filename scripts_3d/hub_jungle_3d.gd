@@ -35,7 +35,7 @@ func _spawn_shrines() -> void:
 		{"id": &"fire", "title": "Fire", "pos": Vector3(-14, 0, -10), "color": Color(1, 0.55, 0.2)},
 		{"id": &"wheel", "title": "Square Descent", "pos": Vector3(0, 0, -16), "color": Color(0.95, 0.8, 0.25)},
 		{"id": &"cart", "title": "Cart", "pos": Vector3(14, 0, -10), "color": Color(0.45, 0.8, 0.95)},
-		{"id": &"chase", "title": "Sacred Banana", "pos": Vector3(0, 0, 14), "color": Color(1, 0.92, 0.3)},
+		{"id": &"chase", "title": "Banana Defense", "pos": Vector3(0, 0, 14), "color": Color(1, 0.92, 0.3)},
 	]
 	var shrine_script: Script = load("res://scripts_3d/shrine_3d.gd")
 	for cfg in configs:

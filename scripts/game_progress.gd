@@ -17,7 +17,7 @@ const SCENES := {
 	MODE_HUB: "res://scenes/levels/hub_jungle.tscn",
 	MODE_FIRE: "res://scenes/levels/fire_camp.tscn",
 	MODE_WHEEL: "res://scenes/levels/wheel_draw.tscn",
-	MODE_CART: "res://scenes/levels/cart_run.tscn",
+	MODE_CART: "res://scenes/levels/banana_maze.tscn",
 	MODE_CHASE: "res://scenes/levels/chase_arena.tscn",
 }
 
@@ -239,17 +239,17 @@ func start_minigame(minigame_id: StringName) -> void:
 	match minigame_id:
 		MODE_FIRE:
 			_set_mode(MODE_FIRE)
-			era_banner_requested.emit("Stone Age Primates", "Invent fire. Or toast a banana. Same thing.")
+			era_banner_requested.emit("Banana Chef", "Take orders. Prep bananas. Keep the customers happy!")
 		MODE_WHEEL:
 			selected_wheel_level = &"gap_gorge"
 			_set_mode(MODE_WHEEL)
 			era_banner_requested.emit("The Wheel Era", "Draw any wheel. Then survive the trail.")
 		MODE_CART:
 			_set_mode(MODE_CART)
-			era_banner_requested.emit("Banana Logistics", "Deliver bananas. Drop as few as possible.")
+			era_banner_requested.emit("Banana Maze", "Grab every banana as fast as you can!")
 		MODE_CHASE:
 			_set_mode(MODE_CHASE)
-			era_banner_requested.emit("Sacred Banana Raid", "Grab them before time runs out!")
+			era_banner_requested.emit("Banana Defense", "Protect the stash from hungry gorillas!")
 		_:
 			# Treat unknown ids as wheel level keys if present
 			if WheelLevels.LEVELS.has(minigame_id):
@@ -266,7 +266,7 @@ func complete_minigame(minigame_id: StringName) -> void:
 				Inventory.add_item(&"fire_kit", 1)
 			juice_shake.emit(0.35)
 			progress_changed.emit()
-			era_banner_requested.emit("Fire Discovered!", "The tribe is slightly less cold and slightly more smug.")
+			era_banner_requested.emit("Kitchen Open!", "Banana Chef has served its first hungry crowd.")
 			await get_tree().create_timer(1.4).timeout
 			load_hub()
 		MODE_WHEEL:
@@ -284,13 +284,18 @@ func complete_minigame(minigame_id: StringName) -> void:
 				Inventory.add_item(&"banana_cart_frame", 1)
 			juice_shake.emit(0.4)
 			progress_changed.emit()
-			era_banner_requested.emit("Banana Cart Online!", "Raid whenever you like.")
+			era_banner_requested.emit("Maze Cleared!", "Every banana found. Speedrun it again anytime.")
 			await get_tree().create_timer(1.4).timeout
 			load_hub()
 		MODE_CHASE:
 			chase_done = true
 			progress_changed.emit()
-			_finish_game()
+			era_banner_requested.emit(
+				"Defense Held!",
+				"%d banana(s) survived the raid." % last_chase_score
+			)
+			await get_tree().create_timer(1.5).timeout
+			load_hub()
 		_:
 			load_hub()
 

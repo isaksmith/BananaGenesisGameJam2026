@@ -18,6 +18,14 @@ func _ready() -> void:
 		get_tree().create_timer(lifetime).timeout.connect(_on_lifetime_ended)
 	elif pickup_mode == "hub":
 		add_to_group("interactable")
+		# Keep hub bananas smaller than shrine icons/pedestals.
+		var spr := get_node_or_null("Sprite") as Sprite2D
+		if spr:
+			spr.scale = Vector2(0.38, 0.38)
+		bob_amount = 3.0
+		var col := get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if col and col.shape is CircleShape2D:
+			(col.shape as CircleShape2D).radius = 12.0
 
 
 func _process(delta: float) -> void:

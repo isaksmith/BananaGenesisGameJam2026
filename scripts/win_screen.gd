@@ -27,7 +27,7 @@ func _on_game_won(final_chase_score: int) -> void:
 	visible = true
 	title_label.text = "The Tribe Invents Reinventing"
 	body_label.text = (
-		"Sacred bananas secured: %d\n\n"
+		"Bananas defended: %d\n\n"
 		+ "Having reinvented fire, the wheel, and logistics,\n"
 		+ "the monkeys invent the *concept* of reinventing the wheel\n"
 		+ "as a recreational sport.\n\n"

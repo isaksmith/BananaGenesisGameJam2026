@@ -17,7 +17,7 @@ func _on_mode_changed(mode: StringName) -> void:
 
 
 func _on_score_changed(score: int) -> void:
-	score_label.text = "Bananas: %d" % score
+	score_label.text = "Stash: %d" % score
 
 
 func _on_time_changed(time_left: float) -> void:

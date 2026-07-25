@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/hub_jungle.gd" id="1_hub"]
 [ext_resource type="PackedScene" path="res://scenes/player/monkey.tscn" id="2_monkey"]
@@ -6,8 +6,9 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/world_pickup.tscn" id="4_pickup"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/banana.tscn" id="5_banana"]
 [ext_resource type="Script" path="res://scripts/climb_zone.gd" id="6_climb"]
-[ext_resource type="Texture2D" path="res://assets/sprites/forest_bg.png" id="7_bg"]
-[ext_resource type="Texture2D" path="res://assets/sprites/toffee/tree_pine_warm.png" id="9_palm"]
+[ext_resource type="Texture2D" path="res://assets/sprites/jungle_parallax/jungle_hub_composed.png" id="7_bg"]
+[ext_resource type="VideoStreamTheora" path="res://assets/video/pixel_jungle_hub.ogv" id="8_vid"]
+[ext_resource type="Texture2D" path="res://assets/sprites/forest/single_tree_0.png" id="9_palm"]
 [ext_resource type="Texture2D" path="res://assets/sprites/flame.png" id="10_fire"]
 [ext_resource type="Texture2D" path="res://assets/sprites/icon_square_wheel.png" id="11_wheel"]
 [ext_resource type="Texture2D" path="res://assets/sprites/banana_cart.png" id="12_cart"]
@@ -25,28 +26,55 @@ size = Vector2(90, 150)
 script = ExtResource("1_hub")
 
 [node name="BgFill" type="Polygon2D" parent="."]
+visible = false
 z_index = -20
-color = Color(0.53, 0.78, 0.82, 1)
+color = Color(0.08, 0.14, 0.12, 1)
 polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
 
-[node name="BgArt" type="Sprite2D" parent="."]
+[node name="BgVideoSprite" type="Sprite2D" parent="."]
+unique_name_in_owner = true
 z_index = -19
+position = Vector2(640, 360)
+texture_filter = 0
+
+[node name="BgVideoHost" type="CanvasLayer" parent="."]
+layer = -100
+
+[node name="BgVideo" type="VideoStreamPlayer" parent="BgVideoHost"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stream = ExtResource("8_vid")
+autoplay = true
+expand = true
+loop = true
+speed_scale = 1.0
+volume_db = -80.0
+
+[node name="BgArt" type="Sprite2D" parent="."]
+z_index = -18
 position = Vector2(640, 360)
 texture = ExtResource("7_bg")
 texture_filter = 0
 
 [node name="Decor" type="Node2D" parent="."]
+visible = false
 z_index = -6
 
 [node name="TreeL" type="Sprite2D" parent="Decor"]
-position = Vector2(48, 520)
-scale = Vector2(1.05, 1.05)
+position = Vector2(36, 560)
+scale = Vector2(2.4, 2.4)
 texture = ExtResource("9_palm")
 texture_filter = 0
 
 [node name="TreeR" type="Sprite2D" parent="Decor"]
-position = Vector2(1232, 520)
-scale = Vector2(1.05, 1.05)
+position = Vector2(1244, 560)
+scale = Vector2(2.4, 2.4)
 texture = ExtResource("9_palm")
 flip_h = true
 texture_filter = 0
@@ -118,7 +146,7 @@ collision_mask = 0
 shape = SubResource("RectangleShape2D_wall")
 
 [node name="Ledge1" type="StaticBody2D" parent="."]
-position = Vector2(200, 385)
+position = Vector2(245, 400)
 collision_layer = 4
 collision_mask = 0
 
@@ -126,7 +154,7 @@ collision_mask = 0
 shape = SubResource("RectangleShape2D_ledge")
 
 [node name="Ledge2" type="StaticBody2D" parent="."]
-position = Vector2(1080, 385)
+position = Vector2(1035, 405)
 collision_layer = 4
 collision_mask = 0
 
@@ -134,7 +162,7 @@ collision_mask = 0
 shape = SubResource("RectangleShape2D_ledge")
 
 [node name="Ledge3" type="StaticBody2D" parent="."]
-position = Vector2(640, 385)
+position = Vector2(590, 385)
 collision_layer = 4
 collision_mask = 0
 
@@ -142,7 +170,7 @@ collision_mask = 0
 shape = SubResource("RectangleShape2D_ledge")
 
 [node name="ClimbZone1" type="Area2D" parent="."]
-position = Vector2(200, 470)
+position = Vector2(245, 485)
 collision_layer = 0
 collision_mask = 1
 script = ExtResource("6_climb")
@@ -151,7 +179,7 @@ script = ExtResource("6_climb")
 shape = SubResource("RectangleShape2D_climb")
 
 [node name="ClimbZone2" type="Area2D" parent="."]
-position = Vector2(1080, 470)
+position = Vector2(1035, 490)
 collision_layer = 0
 collision_mask = 1
 script = ExtResource("6_climb")
@@ -160,7 +188,7 @@ script = ExtResource("6_climb")
 shape = SubResource("RectangleShape2D_climb")
 
 [node name="ClimbZone3" type="Area2D" parent="."]
-position = Vector2(640, 470)
+position = Vector2(590, 470)
 collision_layer = 0
 collision_mask = 1
 script = ExtResource("6_climb")
@@ -219,65 +247,68 @@ lifetime = 9999.0
 z_index = 1
 
 [node name="GapGorge" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(200, 200)
+position = Vector2(168, 208)
 minigame_id = &"gap_gorge"
 title = "Gap Gorge"
 
 [node name="WobbleRidge" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(640, 200)
+position = Vector2(655, 188)
 minigame_id = &"wobble_ridge"
 title = "Wobble Ridge"
 
 [node name="FrostFjord" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(1080, 200)
+position = Vector2(1125, 212)
 minigame_id = &"frost_fjord"
 title = "Frost Fjord"
 
 [node name="NeedlePass" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(200, 350)
+position = Vector2(245, 358)
 minigame_id = &"needle_pass"
 title = "Needle Pass"
 
 [node name="SprintDelta" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(640, 350)
+position = Vector2(590, 338)
 minigame_id = &"sprint_delta"
 title = "Sprint Delta"
 
 [node name="MoonGraveyard" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(1080, 350)
+position = Vector2(1035, 372)
 minigame_id = &"moon_graveyard"
 title = "Moon Graveyard"
 icon_path = "res://assets/sprites/moon_graveyard/Salt.png"
 
 [node name="DesertSky" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(200, 500)
+position = Vector2(175, 518)
 minigame_id = &"desert_sky"
 title = "Desert Sky"
-icon_path = "res://assets/sprites/parallax_desert/shrine_emblem.png"
+icon_path = "res://assets/sprites/hazards/tumbleweed.png"
 
 [node name="LunarVoid" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(640, 500)
+position = Vector2(705, 488)
 minigame_id = &"lunar_void"
 title = "Lunar Void"
-icon_path = "res://assets/sprites/parallax_moon/shrine_emblem.png"
+icon_path = "res://assets/sprites/parallax_moon/crescent_moon.png"
 
 [node name="TigerChase" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(1080, 500)
+position = Vector2(1115, 508)
 minigame_id = &"tiger_chase"
 title = "Tiger Trail"
 icon_path = "res://assets/sprites/tiger/shrine_emblem.png"
 
 [node name="FireShrine" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(200, 650)
+position = Vector2(235, 658)
 minigame_id = &"fire"
-title = "Fire"
+title = "Banana Chef"
+icon_path = "res://assets/sprites/chef_stations/shrine_emblem.png"
 
 [node name="ChaseShrine" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(640, 650)
+position = Vector2(615, 642)
 minigame_id = &"chase"
-title = "Sacred Banana"
+title = "Banana Defense"
+icon_path = "res://assets/sprites/gorilla/shrine_emblem.png"
 
 [node name="CartShrine" parent="Shrines" instance=ExtResource("3_shrine")]
-position = Vector2(1080, 650)
+position = Vector2(1045, 668)
 minigame_id = &"cart"
-title = "Cart"
+title = "Banana Maze"
+icon_path = "res://assets/sprites/leopard/shrine_emblem.png"

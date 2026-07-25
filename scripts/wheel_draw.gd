@@ -170,7 +170,7 @@ func _build_ui() -> void:
 	row.add_child(_make_btn("Big ○", _on_circle_big, false))
 	row.add_child(_make_btn("Small ○", _on_circle_small, false))
 	row.add_child(_make_btn("Square", _on_square, false))
-	row.add_child(_make_btn("RIDE →", _on_ride, true))
+	row.add_child(_make_btn("[E] RIDE →", _on_ride, true))
 
 
 func _texture_rect(path: String) -> TextureRect:
@@ -256,16 +256,17 @@ func _on_canvas_draw() -> void:
 	var center := CANVAS_SIZE * 0.5
 	_draw_steering_wheel(center)
 
-	# User tire shape sits on the wheel face
+	# User tire shape sits on the wheel face — wood + dark tread preview.
 	if _points.size() >= 2:
-		_canvas.draw_polyline(_points, Color(0.95, 0.78, 0.22, 1), 5.0, true)
+		_canvas.draw_polyline(_points, Color(0.18, 0.1, 0.05, 1), 7.0, true)
+		_canvas.draw_polyline(_points, Color(0.55, 0.34, 0.14, 1), 4.0, true)
 	if _points.size() >= 3:
 		var colors := PackedColorArray()
 		colors.resize(_points.size())
-		colors.fill(Color(0.9, 0.7, 0.18, 0.4))
+		colors.fill(Color(0.72, 0.48, 0.24, 0.55))
 		_canvas.draw_polygon(_points, colors)
 	for p in _points:
-		_canvas.draw_circle(p, 2.8, Color(1, 0.95, 0.7, 0.9))
+		_canvas.draw_circle(p, 2.8, Color(0.9, 0.7, 0.4, 0.9))
 
 
 func _draw_steering_wheel(center: Vector2) -> void:
@@ -317,7 +318,13 @@ func _refresh_status() -> void:
 			GameProgress.wheel_fit_note(),
 		]
 	else:
-		_status.text = "Grip the wheel and draw · need %d+ points · then RIDE" % MIN_POINTS
+		_status.text = "Grip the wheel and draw · need %d+ points · then press E to ride" % MIN_POINTS
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("interact"):
+		_on_ride()
+		get_viewport().set_input_as_handled()
 
 
 func _on_clear() -> void:

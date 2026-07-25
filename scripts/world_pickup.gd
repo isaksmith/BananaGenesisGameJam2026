@@ -24,12 +24,13 @@ func _apply_texture() -> void:
 		return
 	var path: String = TEXTURES.get(item_id, TEXTURES[&"stick"])
 	sprite.texture = load(path)
+	# Hub collectibles stay smaller than shrine pedestals/icons.
 	if item_id == &"rock":
-		sprite.scale = Vector2(0.42, 0.42)
+		sprite.scale = Vector2(0.32, 0.32)
 	elif item_id == &"stick":
-		sprite.scale = Vector2(0.75, 0.75)
+		sprite.scale = Vector2(0.34, 0.34)
 	else:
-		sprite.scale = Vector2(0.6, 0.6)
+		sprite.scale = Vector2(0.36, 0.36)
 
 
 func interact(_by: Node) -> void:

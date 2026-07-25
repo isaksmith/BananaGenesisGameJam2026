@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/fire_camp.gd" id="1_fire"]
 [ext_resource type="Texture2D" path="res://assets/sprites/bg_camp_night.png" id="2_bg"]
@@ -6,9 +6,10 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/flame.png" id="4_flame"]
 [ext_resource type="Texture2D" path="res://assets/sprites/tile_palm.png" id="5_palm"]
 [ext_resource type="Texture2D" path="res://assets/sprites/tile_platform.png" id="6_plat"]
+[ext_resource type="PackedScene" path="res://scenes/player/monkey.tscn" id="7_monkey"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
-bg_color = Color(0.9, 0.45, 0.1, 1)
+bg_color = Color(1, 0.76, 0.14, 1)
 
 [node name="FireCamp" type="Node2D"]
 script = ExtResource("1_fire")
@@ -22,6 +23,7 @@ polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
 z_index = -11
 position = Vector2(640, 360)
 texture = ExtResource("2_bg")
+modulate = Color(0.72, 0.82, 0.72, 1)
 texture_filter = 0
 
 [node name="GroundStrip" type="Sprite2D" parent="."]
@@ -62,18 +64,30 @@ flip_h = true
 modulate = Color(0.7, 0.75, 0.85, 1)
 texture_filter = 0
 
-[node name="Stump" type="Sprite2D" parent="."]
-position = Vector2(640, 500)
-scale = Vector2(1.5, 1.5)
+[node name="KitchenSign" type="Sprite2D" parent="."]
+z_index = -2
+position = Vector2(640, 115)
+scale = Vector2(2.3, 1.25)
 texture = ExtResource("3_stump")
 texture_filter = 0
 
-[node name="Flame" type="Sprite2D" parent="."]
+[node name="Title" type="Label" parent="."]
+z_index = 2
+position = Vector2(490, 82)
+size = Vector2(300, 55)
+theme_override_colors/font_color = Color(1, 0.9, 0.25, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.05, 0.01, 1)
+theme_override_constants/outline_size = 7
+theme_override_font_sizes/font_size = 30
+text = "BANANA CHEF"
+horizontal_alignment = 1
+
+[node name="CustomerSlot" type="Marker2D" parent="."]
 unique_name_in_owner = true
-position = Vector2(640, 430)
-scale = Vector2(1.8, 1.8)
-texture = ExtResource("4_flame")
-texture_filter = 0
+position = Vector2(640, 570)
+
+[node name="Monkey" parent="." instance=ExtResource("7_monkey")]
+position = Vector2(640, 560)
 
 [node name="UI" type="CanvasLayer" parent="."]
 
@@ -82,27 +96,70 @@ unique_name_in_owner = true
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -320.0
-offset_top = 40.0
-offset_right = 320.0
-offset_bottom = 100.0
+offset_left = -500.0
+offset_top = 12.0
+offset_right = 500.0
+offset_bottom = 48.0
 grow_horizontal = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 5
-theme_override_font_sizes/font_size = 22
-text = "Hold E to rub sticks"
+theme_override_font_sizes/font_size = 18
+text = "Banana Chef"
 horizontal_alignment = 1
 
-[node name="RubBar" type="ProgressBar" parent="UI"]
+[node name="PatienceBar" type="ProgressBar" parent="UI"]
 unique_name_in_owner = true
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -200.0
-offset_top = 120.0
-offset_right = 200.0
-offset_bottom = 148.0
+offset_left = -170.0
+offset_top = 655.0
+offset_right = 170.0
+offset_bottom = 675.0
 grow_horizontal = 2
 max_value = 100.0
+value = 100.0
 show_percentage = false
 theme_override_styles/fill = SubResource("StyleBoxFlat_bar")
+
+[node name="PatienceText" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -170.0
+offset_top = 632.0
+offset_right = 170.0
+offset_bottom = 654.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 14
+text = "CUSTOMER PATIENCE"
+horizontal_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="UI"]
+unique_name_in_owner = true
+offset_left = 20.0
+offset_top = 58.0
+offset_right = 390.0
+offset_bottom = 90.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 18
+text = "Orders: 0/6"
+
+[node name="HeldLabel" type="Label" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -390.0
+offset_top = 58.0
+offset_right = -20.0
+offset_bottom = 90.0
+grow_horizontal = 0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 18
+text = "Carrying: Nothing"
+horizontal_alignment = 2
