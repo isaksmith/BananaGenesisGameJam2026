@@ -25,10 +25,15 @@ Assets used in this jam build (free for personal/commercial use per authors):
 ## Track platforms
 - **Forest Platform** pack (`ForestPlatform.zip`) — grassy platform tiles, floating islands, trunks, and parallax backgrounds for wheel courses
 - **Ice Platform** pack (`IcePlatform.zip`) — snow/ice platform tiles, pillars, cubes, and fjord backgrounds for Frost Fjord
+- **Moon Graveyard** ([Anokolisa](https://anokolisa.itch.io/moon-graveyard)) — cemetery tiles, stone platforms, and moonlit backgrounds for Moon Graveyard
+- **Parallax (Forest, desert, sky, moon)** ([Bongseng](https://bongseng.itch.io/parallax-forest-desert-sky-moon)) — desert + lunar parallax layers for Desert Sky and Lunar Void
 
 ## Hazards
 - **Floor spikes** pack (`floor spikes.zip`) — wood/metal floor spike sprites for wheel courses
 - **Animated Traps** pack (`Traps.zip`, CC0) — spike trap, fire trap, and bear trap animations on wheel courses
+
+## Chase enemies
+- **Cat Pixel Animations — Bengal** (TigerCatPaid) — side-view tiger run sheet for Tiger Trail chase
 
 Please support these creators on itch.io if you can.
 

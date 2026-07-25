@@ -8,7 +8,7 @@ const WheelObstaclesScript := preload("res://scripts/wheel_obstacles.gd")
 @export var move_accel: float = 1600.0
 @export var scroll_speed: float = 95.0
 @export var gravity: float = 1600.0
-@export var jump_impulse: float = 720.0
+@export var jump_impulse: float = 780.0
 @export var course_length: float = 9000.0
 
 var _level: Dictionary = {}
@@ -20,10 +20,11 @@ var _bananas: int = 0
 var _roll_dist: float = 0.0
 var _scroll_x: float = 640.0
 var _spawn: Vector2 = Vector2(220, 420)
-var _effective_jump: float = 720.0
+var _effective_jump: float = 780.0
 var _effective_accel: float = 1600.0
 var _bumpy: float = 0.0
 var _icy: float = 0.0
+var _theme: StringName = &"forest"
 var _axle_y: float = 22.0
 
 var _wheel: CharacterBody2D
@@ -37,6 +38,9 @@ var _hint: Label
 var _status: Label
 var _finish_x: float = 8800.0
 var _floor_y: float = 520.0
+## Registered ground / floating pads — hazards snap to these surfaces.
+var _platforms: Array[Dictionary] = []
+var _tiger: Area2D = null
 
 const ROCK_VARIANTS := [
 	"res://assets/sprites/rock_small.png",
@@ -58,11 +62,17 @@ func _ready() -> void:
 	_spawn_pickups_and_hazards()
 	_spawn_gd_patterns()
 	_spawn_finish()
+	if bool(_level.get("chase_tiger", false)):
+		_spawn_chase_tiger()
 	_build_camera()
 	_build_ui()
 	var title := str(_level.get("title", "Trail"))
-	_hint.text = "%s · pads launch · spikes/saws kill\n%s\nArrows · Space · Esc/Q · R" % [
+	var tip := "pads launch · spikes kill"
+	if bool(_level.get("chase_tiger", false)):
+		tip = "tiger chases — don't get caught · spikes kill"
+	_hint.text = "%s · %s\n%s\nArrows · Space · Esc/Q · R" % [
 		title,
+		tip,
 		GameProgress.wheel_fit_note(),
 	]
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -74,6 +84,7 @@ func _apply_level_tuning() -> void:
 	_ground_color = _level.get("ground", _ground_color) as Color
 	_bumpy = float(_level.get("bumpy", 0.0))
 	_icy = float(_level.get("icy", 0.0))
+	_theme = StringName(_level.get("theme", &"forest" if _icy < 0.4 else &"winter"))
 	var size := GameProgress.wheel_size_norm
 	var roundness := GameProgress.wheel_roundness
 	var boost := float(_level.get("jump_size_boost", 0.4))
@@ -91,6 +102,7 @@ func _apply_level_tuning() -> void:
 
 
 func _build_world() -> void:
+	_platforms.clear()
 	var sky: Color = _level.get("sky", Color(0.32, 0.58, 0.8)) as Color
 	var bg := Polygon2D.new()
 	bg.z_index = -20
@@ -101,12 +113,23 @@ func _build_world() -> void:
 	])
 	add_child(bg)
 
-	var winter := _icy > 0.4
-	if winter:
-		_build_winter_backdrop()
-		_spawn_snowfall()
-	else:
-		_build_forest_platform_backdrop()
+	var winter := _theme == &"winter" or _icy > 0.4
+	match _theme:
+		&"winter":
+			_build_winter_backdrop()
+			_spawn_snowfall()
+		&"graveyard":
+			_build_graveyard_backdrop()
+		&"desert":
+			_build_parallax_backdrop("res://assets/sprites/parallax_desert/", [
+				"sky.png", "moon.png", "cloud.png", "mountain.png", "dune_mid.png", "dune_front.png"
+			], [0.35, 0.45, 0.55, 0.7, 0.85, 0.95], [2200.0, 2600.0, 2000.0, 2400.0, 1800.0, 1600.0])
+		&"lunar":
+			_build_parallax_backdrop("res://assets/sprites/parallax_moon/", [
+				"sky.png", "earth.png", "back.png", "mid.png", "front.png", "floor.png"
+			], [0.4, 0.5, 0.6, 0.75, 0.88, 0.95], [2200.0, 2600.0, 2400.0, 2000.0, 1800.0, 1600.0])
+		_:
+			_build_forest_platform_backdrop()
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(_level.get("seed", 26))
@@ -125,32 +148,47 @@ func _build_world() -> void:
 		if x < course_length - 200.0:
 			x += rng.randf_range(gap_min, gap_max)
 
-	var platform_count := int(_level.get("platform_count", 28))
+	# Three runnable levels: low stepping pads, mid lane, high lane (floor stretches = ground).
+	# Vertical gaps (~120px+) leave room for the compact cart to jump between lanes.
+	var lane_ys: Array = [
+		float(_level.get("lane_low_y", 455.0)),
+		float(_level.get("lane_mid_y", 335.0)),
+		float(_level.get("lane_high_y", 210.0)),
+	]
+	var spacing := float(_level.get("platform_spacing", 540.0))
+	var platform_count := int(_level.get("platform_count", 36))
 	for i in platform_count:
-		var px := 500.0 + i * 440.0 + rng.randf_range(-40, 80)
+		var px := 420.0 + float(i) * spacing + rng.randf_range(-50, 70)
 		if px > course_length - 200.0:
 			break
-		# Keep platform tops within jump reach of the floor (~150px max rise)
-		var py := rng.randf_range(400.0, 470.0)
-		_add_ground(px, py, rng.randf_range(140.0, 240.0), 28.0)
+		var py: float = float(lane_ys[i % 3]) + rng.randf_range(-12.0, 12.0)
+		_add_ground(px, py, rng.randf_range(120.0, 200.0), 24.0)
 
 	# Ceiling / overhang rocks are SOLID only — bonking your head must not explode the cart.
+	# Keep them above the high lane so mid/low stay passable.
 	var ceiling_count := int(_level.get("ceiling_count", 10))
-	var cy0 := float(_level.get("ceiling_y_min", 120.0))
-	var cy1 := float(_level.get("ceiling_y_max", 210.0))
+	var cy0 := float(_level.get("ceiling_y_min", 70.0))
+	var cy1 := float(_level.get("ceiling_y_max", 140.0))
 	for i in ceiling_count:
 		var px := 700.0 + i * (course_length / float(maxi(ceiling_count, 1)))
 		if px > course_length - 300.0:
 			break
-		if winter:
+		if winter or _theme == &"lunar":
 			_add_snow_prop(Vector2(px, rng.randf_range(cy0, cy1)), "res://assets/sprites/toffee/ice_rock.png", 0.55)
+		elif _theme == &"graveyard":
+			_add_snow_prop(Vector2(px, rng.randf_range(cy0, cy1)), "res://assets/sprites/moon_graveyard/Salt.png", 0.45)
 		else:
 			_add_rock(Vector2(px, rng.randf_range(cy0, cy1)), false, 5)
 
-	if winter:
-		_spawn_winter_trees()
-	else:
-		_spawn_toffee_track_decor(rng)
+	match _theme:
+		&"winter":
+			_spawn_winter_trees()
+		&"graveyard":
+			_spawn_graveyard_decor(rng)
+		&"desert", &"lunar":
+			pass
+		_:
+			_spawn_toffee_track_decor(rng)
 
 
 func _build_forest_platform_backdrop() -> void:
@@ -182,6 +220,117 @@ func _build_forest_platform_backdrop() -> void:
 		add_child(layer_near)
 
 
+func _build_graveyard_backdrop() -> void:
+	var far := load("res://assets/sprites/moon_graveyard/Background_0.png") as Texture2D
+	var mid := load("res://assets/sprites/moon_graveyard/Background_1.png") as Texture2D
+	var grass := load("res://assets/sprites/moon_graveyard/Grass_background_1.png") as Texture2D
+	var grass2 := load("res://assets/sprites/moon_graveyard/Grass_background_2.png") as Texture2D
+	for i in 12:
+		var x := float(i) * 760.0
+		for pair in [
+			[far, -18, 0.55, Color(1, 1, 1, 0.9)],
+			[mid, -17, 0.7, Color(1, 1, 1, 0.85)],
+			[grass, -16, 0.85, Color(1, 1, 1, 0.9)],
+			[grass2, -15, 0.95, Color(1, 1, 1, 0.95)],
+		]:
+			var tex: Texture2D = pair[0]
+			if tex == null:
+				continue
+			var spr := Sprite2D.new()
+			spr.z_index = int(pair[1])
+			spr.texture = tex
+			spr.position = Vector2(x + 100.0 * float(pair[2]), 360)
+			spr.scale = Vector2(1.05, 1.05)
+			spr.modulate = pair[3]
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(spr)
+
+
+func _build_parallax_backdrop(folder: String, files: Array, alphas: Array, spacings: Array) -> void:
+	for layer_i in files.size():
+		var tex := load(folder + String(files[layer_i])) as Texture2D
+		if tex == null:
+			continue
+		var spacing: float = float(spacings[layer_i]) if layer_i < spacings.size() else 2000.0
+		var alpha: float = float(alphas[layer_i]) if layer_i < alphas.size() else 0.8
+		var tiles := maxi(6, int(ceil((course_length + 1600.0) / spacing)) + 1)
+		for i in tiles:
+			var spr := Sprite2D.new()
+			spr.z_index = -18 + layer_i
+			spr.texture = tex
+			# Fit ~720px tall view while keeping pixel look
+			var s := 720.0 / maxf(float(tex.get_height()), 1.0)
+			spr.scale = Vector2(s, s)
+			spr.position = Vector2(float(i) * spacing, 360)
+			spr.modulate = Color(1, 1, 1, alpha)
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(spr)
+
+
+func _tile_graveyard_platform(body: Node2D, width: float, height: float) -> void:
+	var hy := height * 0.5
+	var tex_path := "res://assets/sprites/moon_graveyard/platform_1.png" if width >= 150.0 \
+		else "res://assets/sprites/moon_graveyard/platform_0.png"
+	var tex := load(tex_path) as Texture2D
+	if tex == null:
+		return
+	var y_off := -hy + 2.0 if height < 40.0 else -hy - float(tex.get_height()) * 0.1
+	_tile_cap_row(body, tex, width, y_off)
+	if height >= 40.0:
+		var fill := Polygon2D.new()
+		var hx := width * 0.5
+		fill.color = Color(0.22, 0.21, 0.2, 1)
+		fill.polygon = PackedVector2Array([
+			Vector2(-hx + 4, -hy + 8), Vector2(hx - 4, -hy + 8),
+			Vector2(hx - 4, hy), Vector2(-hx + 4, hy)
+		])
+		fill.z_index = -1
+		body.add_child(fill)
+
+
+func _tile_desert_platform(body: Node2D, width: float, height: float) -> void:
+	# Reuse forest platform caps, tinted sandy, over desert fill.
+	_tile_forest_platform(body, width, height)
+	for child in body.get_children():
+		if child is Sprite2D:
+			(child as Sprite2D).modulate = Color(1.15, 0.95, 0.7, 1)
+
+
+func _spawn_graveyard_decor(rng: RandomNumberGenerator) -> void:
+	var props := [
+		"res://assets/sprites/moon_graveyard/Salt.png",
+		"res://assets/sprites/moon_graveyard/brush.png",
+	]
+	for i in 18:
+		var px := 500.0 + float(i) * 420.0 + rng.randf_range(-40, 80)
+		if px > course_length - 250.0:
+			break
+		var path: String = props[i % props.size()]
+		var s := 0.35 if path.ends_with("brush.png") else 0.5
+		_add_snow_prop(Vector2(px, rng.randf_range(470.0, 520.0)), path, s)
+
+
+## Tile a cap texture across a platform, cropping the final tile so the art
+## never overhangs the physical collision width (falling off "invisible" edges).
+func _tile_cap_row(body: Node2D, tex: Texture2D, width: float, y_off: float) -> void:
+	var tile_w := float(tex.get_width())
+	var tex_h := float(tex.get_height())
+	var left := -width * 0.5
+	var x := left
+	while x < left + width - 0.5:
+		var remaining := left + width - x
+		var w := minf(tile_w, remaining)
+		var spr := Sprite2D.new()
+		spr.texture = tex
+		if w < tile_w - 0.5:
+			spr.region_enabled = true
+			spr.region_rect = Rect2(0, 0, w, tex_h)
+		spr.position = Vector2(x + w * 0.5, y_off)
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		body.add_child(spr)
+		x += w
+
+
 func _tile_forest_platform(body: Node2D, width: float, height: float) -> void:
 	var hy := height * 0.5
 	var tex_path := "res://assets/sprites/forest_platform/platform_0.png"
@@ -192,18 +341,10 @@ func _tile_forest_platform(body: Node2D, width: float, height: float) -> void:
 	var tex := load(tex_path) as Texture2D
 	if tex == null:
 		return
-	var tile_w := float(tex.get_width())
-	var count := maxi(1, int(ceil(width / tile_w)))
-	var start_x := -width * 0.5 + tile_w * 0.5
 	var y_off := -hy - float(tex.get_height()) * 0.15
 	if height < 40.0:
 		y_off = -hy + 2.0
-	for i in count:
-		var spr := Sprite2D.new()
-		spr.texture = tex
-		spr.position = Vector2(start_x + i * tile_w, y_off)
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		body.add_child(spr)
+	_tile_cap_row(body, tex, width, y_off)
 	# Soft dirt fill under the grass cap so tall ground segments still read.
 	if height >= 40.0:
 		var fill := Polygon2D.new()
@@ -385,8 +526,12 @@ func _add_ground(x: float, y: float, width: float, height: float) -> void:
 	])
 	body.add_child(visual)
 
-	if _icy > 0.4:
+	if _theme == &"winter" or _icy > 0.4:
 		_tile_snow_caps(body, width, height)
+	elif _theme == &"graveyard" or _theme == &"lunar":
+		_tile_graveyard_platform(body, width, height)
+	elif _theme == &"desert":
+		_tile_desert_platform(body, width, height)
 	else:
 		_tile_forest_platform(body, width, height)
 
@@ -396,6 +541,45 @@ func _add_ground(x: float, y: float, width: float, height: float) -> void:
 	col.shape = shape
 	body.add_child(col)
 	add_child(body)
+	_platforms.append({
+		"left": x,
+		"right": x + width,
+		"top": y - height * 0.5,
+		"bottom": y + height * 0.5,
+		"w": width,
+		"h": height,
+		"elevated": height < 40.0,
+	})
+
+
+func _plat_point(plat: Dictionary, t: float, hang: bool = false) -> Vector2:
+	var margin := minf(28.0, float(plat["w"]) * 0.25)
+	var px := lerpf(float(plat["left"]) + margin, float(plat["right"]) - margin, clampf(t, 0.05, 0.95))
+	return Vector2(px, float(plat["bottom"]) if hang else float(plat["top"]))
+
+
+func _plats_ground() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in _platforms:
+		if not bool(p["elevated"]):
+			out.append(p)
+	return out
+
+
+func _plats_air() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in _platforms:
+		if bool(p["elevated"]):
+			out.append(p)
+	return out
+
+
+func _plats_high() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in _platforms:
+		if bool(p["elevated"]) and float(p["top"]) < 280.0:
+			out.append(p)
+	return out
 
 
 func _tile_snow_caps(body: Node2D, width: float, height: float) -> void:
@@ -407,18 +591,10 @@ func _tile_snow_caps(body: Node2D, width: float, height: float) -> void:
 	var tex := load(tile_path) as Texture2D
 	if tex == null:
 		return
-	var tile_w := float(tex.get_width())
-	var count := maxi(1, int(ceil(width / tile_w)))
-	var start_x := -width * 0.5 + tile_w * 0.5
 	var y_off := -hy - float(tex.get_height()) * 0.2
 	if height < 40.0:
 		y_off = -hy + 2.0
-	for i in count:
-		var spr := Sprite2D.new()
-		spr.texture = tex
-		spr.position = Vector2(start_x + i * tile_w, y_off)
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		body.add_child(spr)
+	_tile_cap_row(body, tex, width, y_off)
 	if height >= 40.0:
 		var fill := Polygon2D.new()
 		var hx := width * 0.5
@@ -504,8 +680,12 @@ func _add_snow_prop(pos: Vector2, tex_path: String, scale: float = 1.4) -> void:
 
 func _spawn_wheel() -> void:
 	var radius := GameProgress.wheel_radius
-	_axle_y = radius * 0.85
-	var wheel_spread := clampf(radius * 0.95, 20.0, 34.0)
+	# Compact hitbox (unchanged) — visuals can be larger without scraping lanes
+	var wheel_vis := 0.58
+	_axle_y = radius * 0.5 * wheel_vis + 8.0
+	var wheel_spread := clampf(radius * 0.55, 10.0, 18.0)
+	var body_h := radius * 0.9 * wheel_vis + 10.0
+	var body_w := wheel_spread * 2.0 + radius * 0.22 + 4.0
 
 	_wheel = CharacterBody2D.new()
 	_wheel.name = "BananaCart"
@@ -521,16 +701,20 @@ func _spawn_wheel() -> void:
 	_visual.name = "Visual"
 	_wheel.add_child(_visual)
 
+	# Slightly wider axle so tires sit under the bigger cart body
+	var visual_spread := clampf(radius * 0.72, 14.0, 24.0)
 	var poly := GameProgress.get_drawn_wheel()
-	_wheel_l = _make_drawn_wheel_visual(poly, Vector2(-wheel_spread, _axle_y))
-	_wheel_r = _make_drawn_wheel_visual(poly, Vector2(wheel_spread, _axle_y))
+	_wheel_l = _make_drawn_wheel_visual(poly, Vector2(-visual_spread, _axle_y))
+	_wheel_r = _make_drawn_wheel_visual(poly, Vector2(visual_spread, _axle_y))
+	_wheel_l.scale = Vector2(wheel_vis, wheel_vis)
+	_wheel_r.scale = Vector2(wheel_vis, wheel_vis)
 	_visual.add_child(_wheel_l)
 	_visual.add_child(_wheel_r)
 
 	var cart := Sprite2D.new()
 	cart.texture = load("res://assets/sprites/banana_cart.png") as Texture2D
-	cart.position = Vector2(0, _axle_y - radius * 0.12 - 8.0)
-	var cart_scale_y := clampf(0.18 + radius / 240.0, 0.2, 0.3)
+	cart.position = Vector2(0, _axle_y - radius * 0.1 - 6.0)
+	var cart_scale_y := clampf(0.16 + radius / 300.0, 0.18, 0.28)
 	var cart_scale_x := cart_scale_y * 0.62
 	cart.scale = Vector2(cart_scale_x, cart_scale_y)
 	cart.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -539,20 +723,18 @@ func _spawn_wheel() -> void:
 
 	var monkey := Sprite2D.new()
 	monkey.texture = load("res://assets/sprites/monkey_idle.png") as Texture2D
-	monkey.position = Vector2(1, cart.position.y - 16.0)
-	monkey.scale = Vector2(0.42, 0.42)
+	monkey.position = Vector2(1, cart.position.y - 14.0)
+	monkey.scale = Vector2(0.36, 0.36)
 	monkey.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	monkey.z_index = 2
 	_visual.add_child(monkey)
 
-	# Hitbox grows with wheel size — big wheels scrape Needle Pass ceilings
+	# Hitbox locked to the compact size — independent of cart/monkey visuals
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
-	var body_h := radius * 1.85 + 14.0
-	var body_w := wheel_spread * 2.0 + radius * 0.45 + 6.0
 	shape.size = Vector2(body_w, body_h)
 	col.shape = shape
-	col.position = Vector2(0, _axle_y - radius * 0.2)
+	col.position = Vector2(0, _axle_y - body_h * 0.15)
 	_wheel.add_child(col)
 	add_child(_wheel)
 
@@ -594,7 +776,7 @@ func _spawn_pickups_and_hazards() -> void:
 
 
 func _spawn_gd_patterns() -> void:
-	## Geometry Dash–style sections (inspired by classic GD rhythms / OpenGD goals).
+	## Hazards always sit on a platform top or hang from a platform underside.
 	var pattern: StringName = _level.get("pattern", &"gorge")
 	match pattern:
 		&"gorge":
@@ -607,109 +789,251 @@ func _spawn_gd_patterns() -> void:
 			_pattern_sprint()
 		&"frost":
 			_pattern_frost()
+		&"grave":
+			_pattern_grave()
+		&"desert":
+			_pattern_desert()
+		&"lunar":
+			_pattern_lunar()
+		&"jungle":
+			_pattern_jungle()
 		_:
 			_pattern_gorge()
 
 
 func _pattern_gorge() -> void:
-	# Even spike cadence with pads between
 	_obs.use_metal_spikes = false
-	var x := 480.0
-	var i := 0
-	while x < course_length - 420.0:
-		match i % 3:
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 1:
+			continue
+		match i % 6:
 			0:
-				_obs.add_spike(Vector2(x, _floor_y), false, 1.05, Color(1.25, 0.3, 0.35))
-			1:
-				_obs.add_jump_pad(Vector2(x + 20.0, _floor_y - 2.0), 820.0)
-				_obs.add_trap(Vector2(x + 160.0, _floor_y), &"bear", 1.4)
+				_obs.add_spike(_plat_point(p, 0.4), false, 1.05, Color(1.25, 0.3, 0.35))
 			2:
-				_obs.add_spike_row(Vector2(x, _floor_y), 2, 34.0, false, 1.0, Color(1.25, 0.3, 0.35))
-		x += 480.0
-		i += 1
+				_obs.add_jump_pad(_plat_point(p, 0.35) + Vector2(0, -2), 820.0)
+				_obs.add_trap(_plat_point(p, 0.7), &"bear", 1.4)
+			4:
+				_obs.add_spike_row(_plat_point(p, 0.3), 2, 34.0, false, 1.0, Color(1.25, 0.3, 0.35))
+	for i in airs.size():
+		var p: Dictionary = airs[i]
+		if i % 3 == 0:
+			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.95, Color(1.25, 0.3, 0.35))
+		elif i % 3 == 1:
+			_obs.add_spike(_plat_point(p, 0.55), false, 0.95, Color(1.25, 0.3, 0.35))
 
 
 func _pattern_tunnel() -> void:
-	# Even floor+ceiling spike pairs down the ship lane
 	_obs.use_metal_spikes = true
-	var x := 520.0
-	var ceil_y := 310.0
-	var i := 0
-	while x < course_length - 380.0:
-		_obs.add_spike_row(Vector2(x, _floor_y), 2, 32.0, false, 0.85, Color(0.85, 0.35, 0.55))
-		_obs.add_spike_row(Vector2(x + 16.0, ceil_y), 2, 32.0, true, 0.85, Color(0.85, 0.35, 0.55))
-		if i % 2 == 0:
-			_obs.add_block(Vector2(x + 150.0, 360.0), 90.0, 40.0, Color(0.25, 0.28, 0.32))
-		else:
-			_obs.add_trap(Vector2(x + 170.0, _floor_y), &"fire", 1.4)
-		x += 480.0
-		i += 1
+	var grounds := _plats_ground()
+	var highs := _plats_high()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 1:
+			continue
+		_obs.add_spike_row(_plat_point(p, 0.25), 2, 32.0, false, 0.85, Color(0.85, 0.35, 0.55))
+		if i % 4 == 0:
+			_obs.add_trap(_plat_point(p, 0.7), &"fire", 1.4)
+	for i in highs.size():
+		var p: Dictionary = highs[i]
+		_obs.add_spike_row(_plat_point(p, 0.3, true), 2, 32.0, true, 0.85, Color(0.85, 0.35, 0.55))
+	for i in airs.size():
+		var p: Dictionary = airs[i]
+		if i % 4 != 0 or float(p["top"]) < 280.0:
+			continue
+		# Low-lane pads get a solid block hazard sitting on top
+		_obs.add_block(_plat_point(p, 0.5) + Vector2(0, -18), 70.0, 28.0, Color(0.25, 0.28, 0.32))
 
 
 func _pattern_chaos() -> void:
-	# Movers + regularly spaced spike groups
 	_obs.use_metal_spikes = false
-	var x := 500.0
-	var i := 0
-	while x < course_length - 420.0:
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 1:
+			continue
+		_obs.add_spike_row(_plat_point(p, 0.3), 2, 34.0, false, 0.95, Color(0.9, 0.35, 0.2))
+		if i % 3 == 1:
+			_obs.add_trap(_plat_point(p, 0.7), &"spike", 1.5)
+		if i % 3 == 2:
+			_obs.add_jump_pad(_plat_point(p, 0.55) + Vector2(0, -2), 700.0, Color(1.0, 0.7, 0.2))
+	for i in airs.size():
+		var p: Dictionary = airs[i]
 		if i % 2 == 0:
-			_obs.add_moving_platform(
-				Vector2(x + 80.0, 420.0),
-				Vector2(x + 200.0, 300.0),
-				130.0,
+			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.9, Color(0.9, 0.35, 0.2))
+		else:
+			_obs.add_spike(_plat_point(p, 0.5), false, 0.9, Color(0.9, 0.35, 0.2))
+		# Movers between mid/high — spikes ride with them
+		if i % 4 == 0 and i + 1 < airs.size():
+			var a: Dictionary = airs[i]
+			var b: Dictionary = airs[i + 1]
+			var mover: Node2D = _obs.add_moving_platform(
+				_plat_point(a, 0.5),
+				_plat_point(b, 0.5),
+				120.0,
 				2.0 + float(i % 3) * 0.35,
 				Color(0.55, 0.4, 0.22)
 			)
-		_obs.add_spike_row(Vector2(x, _floor_y), 2, 34.0, false, 0.95, Color(0.9, 0.35, 0.2))
-		if i % 3 == 1:
-			_obs.add_trap(Vector2(x + 180.0, _floor_y), &"spike", 1.5)
-		if i % 3 == 2:
-			_obs.add_jump_pad(Vector2(x + 200.0, _floor_y - 2.0), 700.0, Color(1.0, 0.7, 0.2))
-		x += 500.0
-		i += 1
+			_obs.add_spike(Vector2(0, -14), false, 0.85, Color(0.9, 0.35, 0.2), false, mover)
+			_obs.add_spike(Vector2(0, 14), true, 0.85, Color(0.9, 0.35, 0.2), false, mover)
 
 
 func _pattern_sprint() -> void:
-	# Tight even beat: spike / pad / alternating spike packs
 	_obs.use_metal_spikes = false
-	var x := 420.0
-	var beat := 0
-	while x < course_length - 360.0:
-		match beat % 4:
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		match i % 4:
 			0:
-				_obs.add_spike(Vector2(x, _floor_y), false, 1.0, Color(1.2, 0.25, 0.35))
+				_obs.add_spike(_plat_point(p, 0.45), false, 1.0, Color(1.2, 0.25, 0.35))
 			1:
-				_obs.add_jump_pad(Vector2(x + 10.0, _floor_y - 2.0), 760.0, Color(1.2, 0.95, 0.3))
+				_obs.add_jump_pad(_plat_point(p, 0.5) + Vector2(0, -2), 760.0, Color(1.2, 0.95, 0.3))
 			2:
-				_obs.add_spike_row(Vector2(x, _floor_y), 2, 32.0, false, 0.95, Color(1.2, 0.25, 0.35))
+				_obs.add_spike_row(_plat_point(p, 0.3), 2, 32.0, false, 0.95, Color(1.2, 0.25, 0.35))
 			3:
-				_obs.add_trap(Vector2(x + 30.0, _floor_y), &"fire", 1.4)
-		x += 340.0
-		beat += 1
+				_obs.add_trap(_plat_point(p, 0.55), &"fire", 1.4)
+	for i in airs.size():
+		if i % 2 != 0:
+			continue
+		var p: Dictionary = airs[i]
+		if i % 4 == 0:
+			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.9, Color(1.2, 0.25, 0.35))
+		else:
+			_obs.add_spike(_plat_point(p, 0.5), false, 0.9, Color(1.2, 0.25, 0.35))
 
 
 func _pattern_frost() -> void:
-	# Even ice spikes with pads / movers on a steady interval
 	_obs.use_metal_spikes = true
-	var x := 500.0
-	var i := 0
-	while x < course_length - 420.0:
-		_obs.add_spike(Vector2(x, _floor_y), false, 1.05, Color(1.15, 0.35, 0.55))
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 1:
+			continue
+		_obs.add_spike(_plat_point(p, 0.35), false, 1.05, Color(1.15, 0.35, 0.55))
+		match i % 6:
+			0:
+				_obs.add_jump_pad(_plat_point(p, 0.65) + Vector2(0, -2), 740.0, Color(1.2, 0.95, 0.35))
+			2:
+				_obs.add_trap(_plat_point(p, 0.65), &"spike", 1.4, Color(0.8, 0.92, 1.1))
+	for i in airs.size():
+		var p: Dictionary = airs[i]
+		if i % 3 == 0:
+			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.95, Color(1.15, 0.35, 0.55))
+		elif i % 3 == 1:
+			_obs.add_spike(_plat_point(p, 0.5), false, 0.95, Color(1.15, 0.35, 0.55))
+		if i % 5 == 0 and i + 1 < airs.size():
+			var a: Dictionary = airs[i]
+			var b: Dictionary = airs[mini(i + 2, airs.size() - 1)]
+			var mover: Node2D = _obs.add_moving_platform(
+				_plat_point(a, 0.5),
+				_plat_point(b, 0.5),
+				110.0,
+				2.6,
+				Color(0.75, 0.88, 0.98)
+			)
+			_obs.add_trap(Vector2(0, -12), &"spike", 1.2, Color(0.8, 0.92, 1.1), mover)
+
+
+func _pattern_grave() -> void:
+	# Crypt spikes on stone tops + hanging underside traps
+	_obs.use_metal_spikes = true
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	var highs := _plats_high()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 1:
+			continue
+		match i % 4:
+			0:
+				_obs.add_spike_row(_plat_point(p, 0.3), 2, 34.0, false, 0.95, Color(0.75, 0.55, 0.9))
+			2:
+				_obs.add_trap(_plat_point(p, 0.55), &"spike", 1.35, Color(0.85, 0.7, 1.0))
+				_obs.add_jump_pad(_plat_point(p, 0.8) + Vector2(0, -2), 760.0, Color(0.7, 0.85, 1.0))
+	for i in highs.size():
+		_obs.add_spike_row(_plat_point(highs[i], 0.35, true), 2, 30.0, true, 0.9, Color(0.75, 0.55, 0.9))
+	for i in airs.size():
+		if i % 3 != 1:
+			continue
+		_obs.add_spike(_plat_point(airs[i], 0.5), false, 0.9, Color(0.75, 0.55, 0.9))
+
+
+func _pattern_desert() -> void:
+	# Wide pads + sparse sand spikes; hanging spikes on high dunes
+	_obs.use_metal_spikes = false
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
 		match i % 3:
 			0:
-				_obs.add_jump_pad(Vector2(x + 140.0, _floor_y - 2.0), 740.0, Color(1.2, 0.95, 0.35))
+				_obs.add_jump_pad(_plat_point(p, 0.45) + Vector2(0, -2), 820.0, Color(1.15, 0.85, 0.35))
 			1:
-				_obs.add_trap(Vector2(x + 160.0, _floor_y), &"spike", 1.4, Color(0.8, 0.92, 1.1))
+				_obs.add_spike(_plat_point(p, 0.55), false, 1.0, Color(1.2, 0.45, 0.25))
 			2:
-				_obs.add_moving_platform(
-					Vector2(x + 150.0, 450.0),
-					Vector2(x + 150.0, 320.0),
-					120.0,
-					2.6,
-					Color(0.75, 0.88, 0.98)
-				)
-		x += 480.0
-		i += 1
+				_obs.add_trap(_plat_point(p, 0.4), &"bear", 1.35, Color(1.1, 0.9, 0.6))
+	for i in airs.size():
+		var p: Dictionary = airs[i]
+		if i % 4 == 0:
+			_obs.add_spike(_plat_point(p, 0.5, true), true, 0.9, Color(1.2, 0.45, 0.25))
+		elif i % 4 == 2:
+			_obs.add_spike(_plat_point(p, 0.5), false, 0.9, Color(1.2, 0.45, 0.25))
+
+
+func _pattern_lunar() -> void:
+	# Low-grav feel via pads; compact spike tunnels on mid/high
+	_obs.use_metal_spikes = true
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	var highs := _plats_high()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 2 == 0:
+			_obs.add_jump_pad(_plat_point(p, 0.5) + Vector2(0, -2), 860.0, Color(0.75, 0.95, 1.15))
+		else:
+			_obs.add_spike(_plat_point(p, 0.4), false, 0.9, Color(0.7, 0.85, 1.1))
+	for i in highs.size():
+		if i % 2 == 0:
+			_obs.add_spike_row(_plat_point(highs[i], 0.3, true), 2, 28.0, true, 0.85, Color(0.7, 0.85, 1.1))
+	for i in airs.size():
+		if i % 3 == 0:
+			_obs.add_trap(_plat_point(airs[i], 0.5), &"fire", 1.2, Color(0.85, 0.95, 1.15))
+
+
+func _pattern_jungle() -> void:
+	# Sparse wood spikes + pads — the tiger is the main threat
+	_obs.use_metal_spikes = false
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	for i in grounds.size():
+		var p: Dictionary = grounds[i]
+		if i % 3 == 0:
+			_obs.add_spike(_plat_point(p, 0.45), false, 0.9, Color(1.15, 0.4, 0.25))
+		elif i % 3 == 1:
+			_obs.add_jump_pad(_plat_point(p, 0.5) + Vector2(0, -2), 780.0, Color(0.55, 0.9, 0.35))
+		else:
+			_obs.add_trap(_plat_point(p, 0.55), &"bear", 1.2, Color(0.9, 0.75, 0.4))
+	for i in airs.size():
+		if i % 4 == 0:
+			_obs.add_spike(_plat_point(airs[i], 0.5, true), true, 0.85, Color(1.15, 0.4, 0.25))
+
+
+func _spawn_chase_tiger() -> void:
+	if _wheel == null:
+		return
+	var script: Script = load("res://scripts/chase_tiger.gd") as Script
+	_tiger = Area2D.new()
+	_tiger.set_script(script)
+	_tiger.global_position = _spawn + Vector2(-220.0, 20.0)
+	add_child(_tiger)
+	var speed := float(_level.get("tiger_speed", 155.0))
+	_tiger.call("setup", _wheel, _on_hazard, speed)
 
 
 func _spawn_finish() -> void:
@@ -848,6 +1172,10 @@ func _physics_process(delta: float) -> void:
 	var scroll_cap := _finish_x - 200.0
 	if _scroll_x < scroll_cap:
 		_scroll_x += scroll_speed * delta
+		# If the cart outruns the trail pan, accelerate scroll so they aren't braked.
+		var catch_up := _wheel.global_position.x - 480.0
+		if catch_up > _scroll_x:
+			_scroll_x = minf(catch_up, scroll_cap)
 	var cam_y := lerpf(_camera.global_position.y, clampf(_wheel.global_position.y, 280.0, 480.0), 0.08)
 	_camera.global_position = Vector2(_scroll_x, cam_y)
 	if _snow:
@@ -856,7 +1184,9 @@ func _physics_process(delta: float) -> void:
 	var right_limit := _scroll_x + 560.0
 	if _wheel.global_position.x > right_limit:
 		_wheel.global_position.x = right_limit
-		_wheel.velocity.x = minf(_wheel.velocity.x, 0.0)
+		# Only kill forward speed at the hard end of the course (scroll already capped).
+		if _scroll_x >= scroll_cap - 0.5:
+			_wheel.velocity.x = minf(_wheel.velocity.x, 0.0)
 
 	var left_kill := _scroll_x - 660.0
 	if _wheel.global_position.x < left_kill:
@@ -894,7 +1224,13 @@ func _on_hazard(body: Node2D) -> void:
 	if _done or _dead:
 		return
 	if body == _wheel or body.is_in_group("player"):
-		_respawn("Spike / saw! Redesign the wheel if this trail hates your shape.")
+		if _tiger != null and is_instance_valid(_tiger) and _tiger.monitoring:
+			# Prefer a tiger-specific line when the chase is active
+			var near_tiger := _wheel.global_position.distance_to(_tiger.global_position) < 70.0
+			if near_tiger:
+				_respawn("The tiger got you! Keep moving — it never stops.")
+				return
+		_respawn("Spike / trap! Redesign the wheel if this trail hates your shape.")
 
 
 func _control_hint() -> String:
@@ -908,6 +1244,8 @@ func _respawn(msg: String) -> void:
 	_hint.text = msg
 	var boom_at := _wheel.global_position
 	_wheel.velocity = Vector2.ZERO
+	if _tiger != null and is_instance_valid(_tiger):
+		_tiger.call("set_active", false)
 	if _visual:
 		_visual.visible = false
 	_spawn_banana_explosion(boom_at)
@@ -918,6 +1256,9 @@ func _respawn(msg: String) -> void:
 	_wheel.global_position = _spawn
 	_wheel.velocity = Vector2.ZERO
 	_roll_dist = 0.0
+	if _tiger != null and is_instance_valid(_tiger):
+		_tiger.global_position = _spawn + Vector2(-220.0, 20.0)
+		_tiger.call("set_active", true)
 	if _wheel_l:
 		_wheel_l.rotation = 0.0
 	if _wheel_r:

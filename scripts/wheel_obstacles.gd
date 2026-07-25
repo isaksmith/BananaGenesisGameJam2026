@@ -60,7 +60,7 @@ func _danger_modulate(color: Color) -> Color:
 	)
 
 
-func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4), long: bool = false) -> void:
+func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4), long: bool = false, parent: Node = null) -> void:
 	var area := Area2D.new()
 	area.position = pos
 	area.collision_layer = 0
@@ -68,13 +68,18 @@ func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, colo
 	area.monitoring = true
 	area.body_entered.connect(func(b: Node2D) -> void: _on_hazard.call(b))
 	var path := _spike_tex(long)
-	var spr := _sprite(path, 0.38 * scale, upside_down)
+	# Hitbox uses the compact scale; sprite is drawn larger for readability.
+	var hit_scale := 0.24 * scale
+	const VISUAL_BOOST := 1.7
+	var spr := _sprite(path, hit_scale, upside_down)
 	spr.modulate = _danger_modulate(color)
 	var tex := spr.texture
-	var h := float(tex.get_height()) * spr.scale.y if tex else 40.0
-	var w := float(tex.get_width()) * spr.scale.x if tex else 36.0
-	# Sit on ground / hang from ceiling (sprite origin is center)
-	spr.offset = Vector2(0, h * 0.42 if upside_down else -h * 0.42)
+	var h := float(tex.get_height()) * hit_scale if tex else 40.0
+	var w := float(tex.get_width()) * hit_scale if tex else 36.0
+	# Sit on ground / hang from ceiling (offset in texture px; scale applies after)
+	var tex_h := float(tex.get_height()) if tex else 40.0
+	spr.offset = Vector2(0, tex_h * 0.42 if upside_down else -tex_h * 0.42)
+	spr.scale = Vector2(hit_scale * VISUAL_BOOST, hit_scale * VISUAL_BOOST)
 	area.add_child(spr)
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
@@ -82,17 +87,18 @@ func add_spike(pos: Vector2, upside_down: bool = false, scale: float = 1.0, colo
 	col.shape = shape
 	col.position = Vector2(0, h * 0.22 if upside_down else -h * 0.28)
 	area.add_child(col)
-	_host.add_child(area)
+	var host: Node = parent if parent != null else _host
+	host.add_child(area)
 
 
-func add_spike_row(origin: Vector2, count: int, spacing: float, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4)) -> void:
+func add_spike_row(origin: Vector2, count: int, spacing: float, upside_down: bool = false, scale: float = 1.0, color: Color = Color(1.2, 0.35, 0.4), parent: Node = null) -> void:
 	# Place individual spikes evenly — long spikes for denser packs
 	var use_long := count >= 4
 	for i in count:
-		add_spike(origin + Vector2(spacing * float(i), 0.0), upside_down, scale, color, use_long)
+		add_spike(origin + Vector2(spacing * float(i), 0.0), upside_down, scale, color, use_long, parent)
 
 
-func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, color: Color = Color(1, 1, 1)) -> void:
+func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, color: Color = Color(1, 1, 1), parent: Node = null) -> void:
 	var info: Dictionary = TRAPS.get(kind, TRAPS[&"spike"])
 	var area := Area2D.new()
 	area.position = pos
@@ -100,13 +106,16 @@ func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, col
 	area.collision_mask = 1
 	area.monitoring = true
 	area.body_entered.connect(func(b: Node2D) -> void: _on_hazard.call(b))
-	var spr := _sprite(String(info["path"]), scale)
+	# Hitbox uses the compact scale; sprite is drawn larger for readability.
+	var s := 0.62 * scale
+	const VISUAL_BOOST := 1.7
+	var spr := _sprite(String(info["path"]), s * VISUAL_BOOST)
 	var frames := int(info["frames"])
 	spr.hframes = frames
 	spr.modulate = color
-	var frame_h := float(spr.texture.get_height()) * scale if spr.texture else 32.0 * scale
-	var frame_w := 32.0 * scale
-	spr.offset = Vector2(0, -spr.texture.get_height() * 0.5 if spr.texture else -16.0)
+	var frame_h := float(spr.texture.get_height()) * s if spr.texture else 32.0 * s
+	var frame_w := 32.0 * s
+	spr.offset = Vector2(0, -float(spr.texture.get_height()) * 0.5 if spr.texture else -16.0)
 	area.add_child(spr)
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
@@ -114,7 +123,8 @@ func add_trap(pos: Vector2, kind: StringName = &"spike", scale: float = 1.4, col
 	col.shape = shape
 	col.position = Vector2(0, -frame_h * 0.35)
 	area.add_child(col)
-	_host.add_child(area)
+	var host: Node = parent if parent != null else _host
+	host.add_child(area)
 	var fps := float(info["fps"])
 	var tw := _host.create_tween().set_loops()
 	tw.tween_method(
@@ -167,7 +177,7 @@ func add_jump_pad(pos: Vector2, boost: float = 780.0, color: Color = Color(1, 1,
 	tw.tween_property(spr, "scale", Vector2(1.15, 1.15), 0.28).set_trans(Tween.TRANS_SINE)
 
 
-func add_moving_platform(a: Vector2, b: Vector2, width: float = 140.0, period: float = 2.4, color: Color = Color(1, 1, 1)) -> void:
+func add_moving_platform(a: Vector2, b: Vector2, width: float = 140.0, period: float = 2.4, color: Color = Color(1, 1, 1)) -> Node2D:
 	var body := AnimatableBody2D.new()
 	body.global_position = a
 	body.collision_layer = 4
@@ -192,6 +202,7 @@ func add_moving_platform(a: Vector2, b: Vector2, width: float = 140.0, period: f
 	var tw := _host.create_tween().set_loops()
 	tw.tween_property(body, "global_position", b, period).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(body, "global_position", a, period).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	return body
 
 
 func add_block(pos: Vector2, w: float, h: float, color: Color = Color(1, 1, 1)) -> void:
