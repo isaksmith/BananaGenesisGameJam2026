@@ -1,0 +1,19 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/chase_arena.gd" id="1_chase"]
+[ext_resource type="PackedScene" path="res://scenes/levels/arena_01.tscn" id="2_arena"]
+[ext_resource type="PackedScene" path="res://scenes/player/monkey.tscn" id="3_monkey"]
+[ext_resource type="Script" path="res://scripts/banana_spawner.gd" id="4_spawner"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/banana.tscn" id="5_banana"]
+
+[node name="ChaseArena" type="Node2D"]
+script = ExtResource("1_chase")
+
+[node name="Arena01" parent="." instance=ExtResource("2_arena")]
+
+[node name="Monkey" parent="." instance=ExtResource("3_monkey")]
+position = Vector2(640, 360)
+
+[node name="BananaSpawner" type="Node2D" parent="."]
+script = ExtResource("4_spawner")
+banana_scene = ExtResource("5_banana")

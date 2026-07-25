@@ -1,0 +1,108 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/forest_bg.png" id="1_bg"]
+[ext_resource type="Texture2D" path="res://assets/sprites/forest_tree.png" id="2_palm"]
+[ext_resource type="Texture2D" path="res://assets/sprites/obstacle_rock.png" id="3_rock"]
+[ext_resource type="Texture2D" path="res://assets/sprites/tile_pipe_v.png" id="4_pipe"]
+[ext_resource type="Texture2D" path="res://assets/sprites/apple.png" id="5_apple"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
+size = Vector2(40, 800)
+
+[node name="Arena01" type="Node2D"]
+
+[node name="BgFill" type="Polygon2D" parent="."]
+z_index = -12
+color = Color(0.53, 0.78, 0.82, 1)
+polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
+
+[node name="BgArt" type="Sprite2D" parent="."]
+z_index = -11
+position = Vector2(640, 360)
+texture = ExtResource("1_bg")
+texture_filter = 0
+
+[node name="Palm1" type="Sprite2D" parent="."]
+z_index = -6
+position = Vector2(120, 480)
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("2_palm")
+texture_filter = 0
+
+[node name="Palm2" type="Sprite2D" parent="."]
+z_index = -6
+position = Vector2(1160, 500)
+scale = Vector2(1.1, 1.1)
+texture = ExtResource("2_palm")
+flip_h = true
+texture_filter = 0
+
+[node name="Palm3" type="Sprite2D" parent="."]
+z_index = -6
+position = Vector2(980, 460)
+scale = Vector2(1.0, 1.0)
+texture = ExtResource("2_palm")
+texture_filter = 0
+
+[node name="Rock" type="Sprite2D" parent="."]
+z_index = -5
+position = Vector2(640, 360)
+scale = Vector2(1.8, 1.8)
+texture = ExtResource("3_rock")
+texture_filter = 0
+
+[node name="Pipe" type="Sprite2D" parent="."]
+z_index = -5
+position = Vector2(320, 520)
+scale = Vector2(1.1, 1.0)
+texture = ExtResource("4_pipe")
+modulate = Color(1, 1, 1, 0.9)
+texture_filter = 0
+
+[node name="Apple1" type="Sprite2D" parent="."]
+z_index = -4
+position = Vector2(420, 200)
+texture = ExtResource("5_apple")
+texture_filter = 0
+
+[node name="Apple2" type="Sprite2D" parent="."]
+z_index = -4
+position = Vector2(860, 480)
+texture = ExtResource("5_apple")
+texture_filter = 0
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="Left" type="StaticBody2D" parent="Walls"]
+position = Vector2(-20, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Left"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Right" type="StaticBody2D" parent="Walls"]
+position = Vector2(1300, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Right"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Top" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, -20)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Top"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Bottom" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, 740)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Bottom"]
+shape = SubResource("RectangleShape2D_wall")

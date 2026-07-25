@@ -1,0 +1,47 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/shrine.gd" id="1_shrine"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_shrine"]
+radius = 48.0
+
+[node name="Shrine" type="Area2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_shrine")
+
+[node name="Glow" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+z_index = -1
+color = Color(1, 0.85, 0.2, 0.35)
+polygon = PackedVector2Array(-40, 8, -28, -6, 0, -14, 28, -6, 40, 8, 28, 20, 0, 26, -28, 20)
+
+[node name="Pedestal" type="Sprite2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(0, 18)
+scale = Vector2(0.72, 0.72)
+texture_filter = 0
+
+[node name="Icon" type="Sprite2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(0, -10)
+scale = Vector2(1.35, 1.35)
+texture_filter = 0
+
+[node name="Label" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = -80.0
+offset_top = -86.0
+offset_right = 80.0
+offset_bottom = -28.0
+theme_override_colors/font_color = Color(1, 0.98, 0.9, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.04, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 13
+text = "Shrine"
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 8)
+shape = SubResource("CircleShape2D_shrine")

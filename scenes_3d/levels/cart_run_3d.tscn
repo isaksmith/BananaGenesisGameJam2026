@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts_3d/cart_run_3d.gd" id="1_cart"]
+
+[node name="CartRun3D" type="Node3D"]
+script = ExtResource("1_cart")

@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cart"]
+size = Vector2(70, 40)
+
+[node name="BananaCart" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 4
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.55, 0.35, 0.15, 1)
+polygon = PackedVector2Array(-36, -16, 36, -16, 32, 18, -32, 18)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_cart")

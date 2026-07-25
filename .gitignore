@@ -20,3 +20,13 @@ Thumbs.db
 
 # Local Cursor MCP (machine-specific paths)
 .cursor/
+
+# Raw itch downloads (extracted sprites live in assets/sprites/)
+assets/_downloads/
+
+.gd-agentic-skills/
+
+# Bulk itch zip dumps (not project assets)
+PixelAssets/
+
+tools/node_modules/

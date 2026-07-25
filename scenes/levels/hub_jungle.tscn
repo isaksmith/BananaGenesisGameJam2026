@@ -1,0 +1,242 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/hub_jungle.gd" id="1_hub"]
+[ext_resource type="PackedScene" path="res://scenes/player/monkey.tscn" id="2_monkey"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/shrine.tscn" id="3_shrine"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/world_pickup.tscn" id="4_pickup"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/banana.tscn" id="5_banana"]
+[ext_resource type="Script" path="res://scripts/climb_zone.gd" id="6_climb"]
+[ext_resource type="Texture2D" path="res://assets/sprites/forest_bg.png" id="7_bg"]
+[ext_resource type="Texture2D" path="res://assets/sprites/toffee/tree_pine_warm.png" id="9_palm"]
+[ext_resource type="Texture2D" path="res://assets/sprites/icon_fire_kit.png" id="10_fire"]
+[ext_resource type="Texture2D" path="res://assets/sprites/icon_square_wheel.png" id="11_wheel"]
+[ext_resource type="Texture2D" path="res://assets/sprites/banana_cart.png" id="12_cart"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
+size = Vector2(40, 900)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ledge"]
+size = Vector2(96, 22)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_climb"]
+size = Vector2(90, 150)
+
+[node name="HubJungle" type="Node2D"]
+script = ExtResource("1_hub")
+
+[node name="BgFill" type="Polygon2D" parent="."]
+z_index = -20
+color = Color(0.53, 0.78, 0.82, 1)
+polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
+
+[node name="BgArt" type="Sprite2D" parent="."]
+z_index = -19
+position = Vector2(640, 360)
+texture = ExtResource("7_bg")
+texture_filter = 0
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -6
+
+[node name="TreeL" type="Sprite2D" parent="Decor"]
+position = Vector2(48, 520)
+scale = Vector2(1.05, 1.05)
+texture = ExtResource("9_palm")
+texture_filter = 0
+
+[node name="TreeR" type="Sprite2D" parent="Decor"]
+position = Vector2(1232, 520)
+scale = Vector2(1.05, 1.05)
+texture = ExtResource("9_palm")
+flip_h = true
+texture_filter = 0
+
+[node name="Campfire" type="Node2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(520, 430)
+visible = false
+
+[node name="Icon" type="Sprite2D" parent="Campfire"]
+scale = Vector2(1.6, 1.6)
+texture = ExtResource("10_fire")
+texture_filter = 0
+
+[node name="WheelProp" type="Node2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(640, 410)
+visible = false
+
+[node name="Icon" type="Sprite2D" parent="WheelProp"]
+scale = Vector2(1.7, 1.7)
+texture = ExtResource("11_wheel")
+texture_filter = 0
+
+[node name="CartProp" type="Node2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(760, 430)
+visible = false
+
+[node name="Icon" type="Sprite2D" parent="CartProp"]
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("12_cart")
+texture_filter = 0
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="Left" type="StaticBody2D" parent="Walls"]
+position = Vector2(-20, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Left"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Right" type="StaticBody2D" parent="Walls"]
+position = Vector2(1300, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Right"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Top" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, -20)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Top"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Bottom" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, 740)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Bottom"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Ledge1" type="StaticBody2D" parent="."]
+position = Vector2(360, 330)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ledge1"]
+shape = SubResource("RectangleShape2D_ledge")
+
+[node name="Ledge2" type="StaticBody2D" parent="."]
+position = Vector2(920, 330)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ledge2"]
+shape = SubResource("RectangleShape2D_ledge")
+
+[node name="ClimbZone1" type="Area2D" parent="."]
+position = Vector2(360, 415)
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("6_climb")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone1"]
+shape = SubResource("RectangleShape2D_climb")
+
+[node name="ClimbZone2" type="Area2D" parent="."]
+position = Vector2(920, 415)
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("6_climb")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone2"]
+shape = SubResource("RectangleShape2D_climb")
+
+[node name="Monkey" parent="." instance=ExtResource("2_monkey")]
+position = Vector2(640, 520)
+
+[node name="Pickups" type="Node2D" parent="."]
+
+[node name="Stick1" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(110, 545)
+item_id = &"stick"
+
+[node name="Stick2" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(420, 610)
+item_id = &"stick"
+
+[node name="Stick3" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(255, 375)
+item_id = &"stick"
+
+[node name="Stick4" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(720, 575)
+item_id = &"stick"
+
+[node name="Rock1" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(880, 600)
+item_id = &"rock"
+
+[node name="Rock2" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(1040, 390)
+item_id = &"rock"
+
+[node name="Rock3" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(1185, 530)
+item_id = &"rock"
+
+[node name="Rock4" parent="Pickups" instance=ExtResource("4_pickup")]
+position = Vector2(560, 630)
+item_id = &"rock"
+
+[node name="Banana1" parent="Pickups" instance=ExtResource("5_banana")]
+position = Vector2(430, 470)
+pickup_mode = "hub"
+lifetime = 9999.0
+
+[node name="Banana2" parent="Pickups" instance=ExtResource("5_banana")]
+position = Vector2(850, 470)
+pickup_mode = "hub"
+lifetime = 9999.0
+
+[node name="Shrines" type="Node2D" parent="."]
+z_index = 1
+
+[node name="GapGorge" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(160, 170)
+minigame_id = &"gap_gorge"
+title = "Gap Gorge"
+
+[node name="WobbleRidge" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(640, 110)
+minigame_id = &"wobble_ridge"
+title = "Wobble Ridge"
+
+[node name="FrostFjord" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(1120, 170)
+minigame_id = &"frost_fjord"
+title = "Frost Fjord"
+
+[node name="NeedlePass" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(360, 300)
+minigame_id = &"needle_pass"
+title = "Needle Pass"
+
+[node name="SprintDelta" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(920, 300)
+minigame_id = &"sprint_delta"
+title = "Sprint Delta"
+
+[node name="FireShrine" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(160, 620)
+minigame_id = &"fire"
+title = "Fire"
+
+[node name="ChaseShrine" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(640, 640)
+minigame_id = &"chase"
+title = "Sacred Banana"
+
+[node name="CartShrine" parent="Shrines" instance=ExtResource("3_shrine")]
+position = Vector2(1120, 620)
+minigame_id = &"cart"
+title = "Cart"

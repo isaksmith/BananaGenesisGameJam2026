@@ -1,0 +1,38 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/tribe_helper.gd" id="1_tribe"]
+[ext_resource type="Texture2D" path="res://assets/sprites/monkey_idle.png" id="2_monkey"]
+[ext_resource type="Texture2D" path="res://assets/sprites/banana.png" id="3_banana"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 18.0
+
+[node name="TribeHelper" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 4
+script = ExtResource("1_tribe")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+modulate = Color(1.05, 0.9, 0.75, 1)
+scale = Vector2(0.35, 0.35)
+texture = ExtResource("2_monkey")
+
+[node name="StolenBanana" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(14, -10)
+scale = Vector2(0.4, 0.4)
+texture = ExtResource("3_banana")
+
+[node name="Label" type="Label" parent="."]
+offset_left = -40.0
+offset_top = -40.0
+offset_right = 40.0
+offset_bottom = -20.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 12
+text = "Helper?"
+horizontal_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")

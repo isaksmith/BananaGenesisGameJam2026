@@ -1,0 +1,269 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/cart_run.gd" id="1_cart"]
+[ext_resource type="Texture2D" path="res://assets/sprites/bananas_pile.png" id="2_pile"]
+[ext_resource type="Script" path="res://scripts/cart_vehicle.gd" id="3_vehicle"]
+[ext_resource type="Texture2D" path="res://assets/sprites/forest_bg.png" id="4_bg"]
+[ext_resource type="Texture2D" path="res://assets/sprites/obstacle_rock.png" id="5_rock"]
+[ext_resource type="Texture2D" path="res://assets/sprites/tile_pipe_v.png" id="6_pipe"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hut_a.png" id="7_hut_a"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hut_b.png" id="8_hut_b"]
+[ext_resource type="Texture2D" path="res://assets/sprites/banana_cart.png" id="9_cart"]
+[ext_resource type="Texture2D" path="res://assets/sprites/icon_square_wheel.png" id="10_wheel"]
+[ext_resource type="Texture2D" path="res://assets/sprites/forest_tree.png" id="11_palm"]
+[ext_resource type="Texture2D" path="res://assets/sprites/apple.png" id="12_apple"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cart"]
+size = Vector2(70, 40)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_cargo"]
+radius = 28.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_drop"]
+size = Vector2(120, 120)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
+size = Vector2(40, 900)
+
+[node name="CartRun" type="Node2D"]
+script = ExtResource("1_cart")
+
+[node name="BgFill" type="Polygon2D" parent="."]
+z_index = -12
+color = Color(0.53, 0.78, 0.82, 1)
+polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
+
+[node name="BgArt" type="Sprite2D" parent="."]
+z_index = -11
+position = Vector2(640, 360)
+texture = ExtResource("4_bg")
+texture_filter = 0
+
+[node name="DecorPalm1" type="Sprite2D" parent="."]
+z_index = -7
+position = Vector2(120, 200)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("11_palm")
+texture_filter = 0
+
+[node name="DecorPalm2" type="Sprite2D" parent="."]
+z_index = -7
+position = Vector2(640, 100)
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("11_palm")
+flip_h = true
+texture_filter = 0
+
+[node name="DecorApple" type="Sprite2D" parent="."]
+z_index = -6
+position = Vector2(400, 180)
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("12_apple")
+texture_filter = 0
+
+[node name="Hazards" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="Bump1" type="StaticBody2D" parent="."]
+position = Vector2(520, 300)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="Sprite2D" parent="Bump1"]
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("5_rock")
+texture_filter = 0
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Bump1"]
+polygon = PackedVector2Array(-42, 28, -20, -18, 18, -28, 44, 24, 20, 34, -24, 34)
+
+[node name="Bump2" type="StaticBody2D" parent="."]
+position = Vector2(780, 420)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="Sprite2D" parent="Bump2"]
+scale = Vector2(1.1, 1.0)
+texture = ExtResource("6_pipe")
+texture_filter = 0
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Bump2"]
+polygon = PackedVector2Array(-28, 84, -28, -84, 28, -84, 28, 84)
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="Left" type="StaticBody2D" parent="Walls"]
+position = Vector2(-20, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Left"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Right" type="StaticBody2D" parent="Walls"]
+position = Vector2(1300, 360)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Right"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Top" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, -20)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Top"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Bottom" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, 740)
+rotation = 1.5708
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Bottom"]
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="BananaPile" type="Node2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(220, 320)
+
+[node name="PileMarker" type="Sprite2D" parent="BananaPile"]
+modulate = Color(1, 1, 1, 0.95)
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("2_pile")
+texture_filter = 0
+
+[node name="Cart" type="CharacterBody2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(180, 500)
+collision_layer = 1
+collision_mask = 4
+script = ExtResource("3_vehicle")
+
+[node name="Body" type="Sprite2D" parent="Cart"]
+position = Vector2(0, -18)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("9_cart")
+texture_filter = 0
+
+[node name="WheelL" type="Sprite2D" parent="Cart"]
+position = Vector2(-22, 18)
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_wheel")
+texture_filter = 0
+
+[node name="WheelR" type="Sprite2D" parent="Cart"]
+position = Vector2(22, 18)
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_wheel")
+texture_filter = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cart"]
+shape = SubResource("RectangleShape2D_cart")
+
+[node name="CargoArea" type="Area2D" parent="Cart"]
+unique_name_in_owner = true
+collision_layer = 0
+collision_mask = 0
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cart/CargoArea"]
+shape = SubResource("CircleShape2D_cargo")
+
+[node name="DropoffZone" type="Area2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(1080, 360)
+collision_layer = 0
+collision_mask = 1
+
+[node name="Hut" type="Sprite2D" parent="DropoffZone"]
+scale = Vector2(1.15, 1.15)
+texture = ExtResource("7_hut_a")
+texture_filter = 0
+
+[node name="Glow" type="Polygon2D" parent="DropoffZone"]
+z_index = -1
+color = Color(1, 0.85, 0.2, 0.22)
+polygon = PackedVector2Array(-60, -60, 60, -60, 60, 60, -60, 60)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DropoffZone"]
+shape = SubResource("RectangleShape2D_drop")
+
+[node name="HutLabel" type="Label" parent="DropoffZone"]
+offset_left = -30.0
+offset_top = -78.0
+offset_right = 30.0
+offset_bottom = -58.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 16
+text = "Hut A"
+horizontal_alignment = 1
+
+[node name="DropoffZoneB" type="Area2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(1080, 560)
+collision_layer = 0
+collision_mask = 1
+
+[node name="Hut" type="Sprite2D" parent="DropoffZoneB"]
+scale = Vector2(1.15, 1.15)
+texture = ExtResource("8_hut_b")
+texture_filter = 0
+
+[node name="Glow" type="Polygon2D" parent="DropoffZoneB"]
+z_index = -1
+color = Color(0.3, 0.9, 1, 0.22)
+polygon = PackedVector2Array(-60, -60, 60, -60, 60, 60, -60, 60)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DropoffZoneB"]
+shape = SubResource("RectangleShape2D_drop")
+
+[node name="HutLabel" type="Label" parent="DropoffZoneB"]
+offset_left = -30.0
+offset_top = -78.0
+offset_right = 30.0
+offset_bottom = -58.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 16
+text = "Hut B"
+horizontal_alignment = 1
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HintLabel" type="Label" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -400.0
+offset_top = 24.0
+offset_right = 400.0
+offset_bottom = 90.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 20
+text = "Deliver bananas"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 96.0
+offset_right = 260.0
+offset_bottom = 130.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+text = "Status"
+horizontal_alignment = 1
