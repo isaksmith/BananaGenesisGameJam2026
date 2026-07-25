@@ -329,8 +329,17 @@ func _on_clear() -> void:
 func _on_square() -> void:
 	var c := CANVAS_SIZE * 0.5
 	var s := 150.0
+	# Corners + edge midpoints so the default clears MIN_POINTS (8).
 	_points = PackedVector2Array([
-		c + Vector2(-s, -s), c + Vector2(s, -s), c + Vector2(s, s), c + Vector2(-s, s), c + Vector2(-s, -s)
+		c + Vector2(-s, -s),
+		c + Vector2(0, -s),
+		c + Vector2(s, -s),
+		c + Vector2(s, 0),
+		c + Vector2(s, s),
+		c + Vector2(0, s),
+		c + Vector2(-s, s),
+		c + Vector2(-s, 0),
+		c + Vector2(-s, -s),
 	])
 	_refresh_status()
 	_canvas.queue_redraw()
