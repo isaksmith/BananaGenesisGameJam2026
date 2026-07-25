@@ -26,7 +26,8 @@ assets/_downloads/
 
 .gd-agentic-skills/
 
-# Bulk itch zip dumps (not project assets)
-PixelAssets/
+# Shared itch asset library — packs stay zipped, extract what you need into assets/
+!PixelAssets/
+!PixelAssets/**/*.zip
 
 tools/node_modules/
