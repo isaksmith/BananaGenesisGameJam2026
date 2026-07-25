@@ -53,6 +53,17 @@ assets/credits/  Third-party asset credits
 
 Third-party itch.io / FreePixel / Kenney assets are listed in [`assets/credits/ITCH_CREDITS.md`](assets/credits/ITCH_CREDITS.md). Please support those creators if you can.
 
+## Play online (itch.io)
+
+A browser build is exported with Godot’s **Web** preset (single-threaded, Compatibility/WebGL):
+
+1. In Godot: **Project → Export → Web → Export Project**  
+   (preset is saved in `export_presets.cfg`; output goes to `builds/web/`).
+2. Zip the **contents** of `builds/web/` so `index.html` is at the zip root  
+   (also produced as `builds/banana-genesis-web.zip`).
+3. On [itch.io](https://itch.io/game/new): create a project → **Kind: HTML** → upload the zip → enable **This file will be played in the browser**.
+4. Viewport size: **1280 × 720**. Pricing: **No payments / free**.
+
 ## License
 
 Jam project — see asset credit files for third-party terms. Game code is provided for the jam unless otherwise noted.
