@@ -15,9 +15,10 @@ extends Node2D
 const TEX_MONKEY := "res://assets/sprites/monkey_idle.png"
 const TEX_BANANA := "res://assets/sprites/banana.png"
 const BG_VIDEO := "res://assets/video/maze-background.ogv"
+const BG_STILL := "res://assets/sprites/maze_background_still.png"
 const MUSIC := "res://assets/audio/trails/banana-maze-sound.mp3"
 const SFX_HURT := "res://assets/audio/sfx/sfx_hurt.ogg"
-const LEOPARD_SCRIPT := "res://scripts/maze_leopard.gd"
+const LEOPARD_SCRIPT := preload("res://scripts/maze_leopard.gd")
 const MONKEY_VISUAL_SCALE := 0.9
 
 # Floors stay readable but translucent so the looping BG video shows through.
@@ -65,6 +66,10 @@ func _ready() -> void:
 	_update_status()
 
 
+func _is_web() -> bool:
+	return OS.has_feature("web") or OS.get_name() == "Web"
+
+
 func _build_background() -> void:
 	# Fallback fill under the video (also covers letterboxing).
 	var fill := Polygon2D.new()
@@ -74,6 +79,11 @@ func _build_background() -> void:
 		Vector2(0, 0), Vector2(1280, 0), Vector2(1280, 720), Vector2(0, 720)
 	])
 	add_child(fill)
+
+	# Web: high-res still (Theora freezes/crashes itch.io). Desktop: real video.
+	if _is_web():
+		_build_still_background()
+		return
 
 	var host := CanvasLayer.new()
 	host.name = "BgVideoHost"
@@ -85,16 +95,31 @@ func _build_background() -> void:
 	player.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	player.expand = true
 	player.loop = true
-	player.autoplay = true
 	player.volume_db = -80.0
 	var stream := load(BG_VIDEO) as VideoStream
-	if stream:
-		player.stream = stream
-	else:
+	if stream == null:
 		push_error("Failed to load maze background video: %s" % BG_VIDEO)
+		_build_still_background()
+		return
+	player.stream = stream
 	host.add_child(player)
-	if stream:
-		player.play()
+	player.play()
+
+
+func _build_still_background() -> void:
+	var tex := load(BG_STILL) as Texture2D
+	if tex == null:
+		return
+	var spr := Sprite2D.new()
+	spr.name = "BgStill"
+	spr.z_index = -18
+	spr.texture = tex
+	spr.centered = false
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var size := tex.get_size()
+	if size.x > 0.0 and size.y > 0.0:
+		spr.scale = Vector2(1280.0 / size.x, 720.0 / size.y)
+	add_child(spr)
 
 
 func _generate_maze() -> void:
@@ -196,34 +221,56 @@ func _render_maze() -> void:
 	walls.collision_mask = 0
 	add_child(walls)
 
+	# One draw node instead of hundreds of Polygon2Ds (web-friendly).
+	var drawer := MazeDrawer.new()
+	drawer.name = "MazeDraw"
+	drawer.z_index = -8
+	drawer.setup(self)
+	add_child(drawer)
+
 	for y in rows:
 		for x in cols:
-			var pos := _cell_center(x, y)
-			if bool(_grid[y][x]):
-				# Hedge block: body + shape + layered color.
-				var col := CollisionShape2D.new()
-				var shape := RectangleShape2D.new()
-				shape.size = Vector2(cell, cell)
-				col.shape = shape
-				col.position = pos
-				walls.add_child(col)
+			if not bool(_grid[y][x]):
+				continue
+			var col := CollisionShape2D.new()
+			var shape := RectangleShape2D.new()
+			shape.size = Vector2(cell, cell)
+			col.shape = shape
+			col.position = _cell_center(x, y)
+			walls.add_child(col)
 
-				var base := Polygon2D.new()
-				base.z_index = -8
-				base.color = COLOR_HEDGE
-				base.polygon = _cell_rect(pos, cell)
-				add_child(base)
-				var top := Polygon2D.new()
-				top.z_index = -7
-				top.color = COLOR_HEDGE_TOP
-				top.polygon = _cell_rect(pos - Vector2(0, cell * 0.16), cell * 0.82)
-				add_child(top)
-			else:
-				var floor_poly := Polygon2D.new()
-				floor_poly.z_index = -10
-				floor_poly.color = COLOR_FLOOR if (x + y) % 2 == 0 else COLOR_FLOOR_ALT
-				floor_poly.polygon = _cell_rect(pos, cell)
-				add_child(floor_poly)
+
+class MazeDrawer extends Node2D:
+	var _maze: Node2D
+
+	func setup(maze: Node2D) -> void:
+		_maze = maze
+		queue_redraw()
+
+	func _draw() -> void:
+		if _maze == null:
+			return
+		var g: Array = _maze.get("_grid")
+		var c: float = float(_maze.get("cell"))
+		var origin: Vector2 = _maze.get("_origin")
+		var cols_n: int = int(_maze.get("cols"))
+		var rows_n: int = int(_maze.get("rows"))
+		for y in rows_n:
+			for x in cols_n:
+				var pos := origin + Vector2((float(x) + 0.5) * c, (float(y) + 0.5) * c)
+				var half := c * 0.5
+				var rect := Rect2(pos.x - half, pos.y - half, c, c)
+				if bool(g[y][x]):
+					draw_rect(rect, Color(0.12, 0.26, 0.12, 1.0), true)
+					var top := Rect2(rect.position + Vector2(c * 0.09, -c * 0.16), Vector2(c * 0.82, c * 0.82))
+					draw_rect(top, Color(0.18, 0.36, 0.18, 1.0), true)
+				else:
+					var floor_c := (
+						Color(0.28, 0.40, 0.22, 0.55)
+						if (x + y) % 2 == 0
+						else Color(0.24, 0.36, 0.20, 0.52)
+					)
+					draw_rect(rect, floor_c, true)
 
 
 func _spawn_player() -> void:
@@ -260,34 +307,35 @@ func _spawn_player() -> void:
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_player.add_child(spr)
 
-	# Same banana-dust trail as the home hub monkey.
-	_trail = CPUParticles2D.new()
-	_trail.name = "MoveTrail"
-	_trail.z_index = -4
-	_trail.emitting = false
-	_trail.amount = 28
-	_trail.lifetime = 0.45
-	_trail.preprocess = 0.0
-	_trail.explosiveness = 0.0
-	_trail.randomness = 0.4
-	_trail.local_coords = false
-	_trail.direction = Vector2(0, -1)
-	_trail.spread = 50.0
-	_trail.gravity = Vector2(0, -20)
-	_trail.initial_velocity_min = 18.0
-	_trail.initial_velocity_max = 55.0
-	_trail.scale_amount_min = 2.5
-	_trail.scale_amount_max = 5.5
-	_trail.color = Color(1.0, 0.88, 0.35, 0.75)
-	var grad := Gradient.new()
-	grad.colors = PackedColorArray([
-		Color(1.0, 0.95, 0.45, 0.8),
-		Color(1.0, 0.55, 0.15, 0.35),
-		Color(0.6, 0.25, 0.05, 0.0),
-	])
-	_trail.color_ramp = grad
-	_player.add_child(_trail)
-	_player.move_child(_trail, 0)
+	# Particles/afterimages are desktop-only — cheaper path for itch.io web.
+	if not _is_web():
+		_trail = CPUParticles2D.new()
+		_trail.name = "MoveTrail"
+		_trail.z_index = -4
+		_trail.emitting = false
+		_trail.amount = 28
+		_trail.lifetime = 0.45
+		_trail.preprocess = 0.0
+		_trail.explosiveness = 0.0
+		_trail.randomness = 0.4
+		_trail.local_coords = false
+		_trail.direction = Vector2(0, -1)
+		_trail.spread = 50.0
+		_trail.gravity = Vector2(0, -20)
+		_trail.initial_velocity_min = 18.0
+		_trail.initial_velocity_max = 55.0
+		_trail.scale_amount_min = 2.5
+		_trail.scale_amount_max = 5.5
+		_trail.color = Color(1.0, 0.88, 0.35, 0.75)
+		var grad := Gradient.new()
+		grad.colors = PackedColorArray([
+			Color(1.0, 0.95, 0.45, 0.8),
+			Color(1.0, 0.55, 0.15, 0.35),
+			Color(0.6, 0.25, 0.05, 0.0),
+		])
+		_trail.color_ramp = grad
+		_player.add_child(_trail)
+		_player.move_child(_trail, 0)
 
 	add_child(_player)
 
@@ -318,19 +366,19 @@ func _spawn_bananas() -> void:
 		spr.z_index = 3
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		area.add_child(spr)
-		# Gentle bob so pickups pop.
-		var tw := create_tween().set_loops()
-		tw.tween_property(spr, "position:y", -4.0, 0.5).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(spr, "position:y", 2.0, 0.5).set_trans(Tween.TRANS_SINE)
+		# Gentle bob so pickups pop (skip endless tweens on web).
+		if not _is_web():
+			var tw := create_tween().set_loops()
+			tw.tween_property(spr, "position:y", -4.0, 0.5).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(spr, "position:y", 2.0, 0.5).set_trans(Tween.TRANS_SINE)
 		area.body_entered.connect(_on_banana_collected.bind(area))
 		add_child(area)
 		_bananas.append(area)
 
 
 func _spawn_leopard() -> void:
-	var script := load(LEOPARD_SCRIPT) as Script
 	_leopard = CharacterBody2D.new()
-	_leopard.set_script(script)
+	_leopard.set_script(LEOPARD_SCRIPT)
 	add_child(_leopard)
 	_leopard.call("setup", self, _player, _on_leopard_caught, leopard_speed)
 	_leopard.call("place_at_cell", _far_open_cell())
@@ -368,7 +416,7 @@ func _physics_process(delta: float) -> void:
 		_trail.emitting = moving
 		if moving:
 			_trail.direction = -_player.velocity.normalized() if _player.velocity.length() > 1.0 else Vector2(0, -1)
-			if randf() < delta * 18.0:
+			if not _is_web() and randf() < delta * 18.0:
 				_spawn_afterimage(spr)
 	if _leopard and is_instance_valid(_leopard) and _leopard.has_method("arm_catch"):
 		_leopard.call("arm_catch", _invuln_t <= 0.0 and _grace_t <= 0.0 and not _catching)

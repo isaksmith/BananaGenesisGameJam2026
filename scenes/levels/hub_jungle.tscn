@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/hub_jungle.gd" id="1_hub"]
 [ext_resource type="PackedScene" path="res://scenes/player/monkey.tscn" id="2_monkey"]
@@ -6,8 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/world_pickup.tscn" id="4_pickup"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/banana.tscn" id="5_banana"]
 [ext_resource type="Script" path="res://scripts/climb_zone.gd" id="6_climb"]
-[ext_resource type="Texture2D" path="res://assets/sprites/jungle_parallax/jungle_hub_composed.png" id="7_bg"]
-[ext_resource type="VideoStreamTheora" path="res://assets/video/pixel_jungle_hub.ogv" id="8_vid"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hub_background_still.png" id="7_bg"]
 [ext_resource type="Texture2D" path="res://assets/sprites/forest/single_tree_0.png" id="9_palm"]
 [ext_resource type="Texture2D" path="res://assets/sprites/flame.png" id="10_fire"]
 [ext_resource type="Texture2D" path="res://assets/sprites/icon_square_wheel.png" id="11_wheel"]
@@ -33,28 +32,10 @@ polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
 
 [node name="BgVideoSprite" type="Sprite2D" parent="."]
 unique_name_in_owner = true
+visible = false
 z_index = -19
 position = Vector2(640, 360)
 texture_filter = 0
-
-[node name="BgVideoHost" type="CanvasLayer" parent="."]
-layer = -100
-
-[node name="BgVideo" type="VideoStreamPlayer" parent="BgVideoHost"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-stream = ExtResource("8_vid")
-autoplay = true
-expand = true
-loop = true
-speed_scale = 1.0
-volume_db = -80.0
 
 [node name="BgArt" type="Sprite2D" parent="."]
 z_index = -18

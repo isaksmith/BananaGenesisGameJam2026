@@ -1,4 +1,11 @@
 ; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
 [application]
@@ -22,7 +29,6 @@ AudioSettings="*res://scripts/audio_settings.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [input]
 
@@ -80,10 +86,10 @@ exit_minigame={
 [layer_names]
 
 2d_physics/layer_1="player"
-2d_physics/layer_2="banana"
-2d_physics/layer_3="world"
 3d_physics/layer_1="player"
+2d_physics/layer_2="banana"
 3d_physics/layer_2="interactable"
+2d_physics/layer_3="world"
 3d_physics/layer_3="world"
 
 [rendering]

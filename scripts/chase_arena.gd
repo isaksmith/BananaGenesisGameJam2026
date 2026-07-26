@@ -10,6 +10,7 @@ const SPAWN_INTERVAL := 0.85
 const TARGET_LIVE_GORILLAS := 5
 const GORILLA_SCRIPT := "res://scripts/thief_gorilla.gd"
 const MUSIC := "res://assets/audio/trails/banana-defense-sound.mp3"
+const BG_VIDEO := "res://assets/video/banana-defense-background.ogv"
 
 @export var gorilla_speed: float = 95.0
 @export var max_live_gorillas: int = 6
@@ -32,6 +33,7 @@ var _player: CharacterBody2D
 func _ready() -> void:
 	AudioSettings.play_music(MUSIC)
 	_player = get_node_or_null("Monkey") as CharacterBody2D
+	_disable_web_bg_video()
 	_build_stash()
 	_build_hint()
 	# Hide / disable the old banana spawner if present.
@@ -42,6 +44,36 @@ func _ready() -> void:
 		spawner.visible = false
 	GameProgress.mode_changed.connect(_on_mode_changed)
 	_start_round()
+
+
+func _disable_web_bg_video() -> void:
+	# Desktop: Theora overlay. Web: high-res still (Theora freezes/crashes itch.io).
+	var arena := get_node_or_null("Arena01")
+	if arena == null:
+		return
+	var bg_art := arena.get_node_or_null("BgArt") as CanvasItem
+	if bg_art:
+		bg_art.visible = true
+	if OS.has_feature("web") or OS.get_name() == "Web":
+		return
+	var host := CanvasLayer.new()
+	host.name = "BgVideoHost"
+	host.layer = -100
+	arena.add_child(host)
+	arena.move_child(host, 0)
+	var video := VideoStreamPlayer.new()
+	video.name = "BgVideo"
+	video.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	video.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	video.expand = true
+	video.loop = true
+	video.volume_db = -80.0
+	video.stream = load(BG_VIDEO) as VideoStream
+	host.add_child(video)
+	if video.stream:
+		video.play()
+		if bg_art:
+			bg_art.visible = false
 
 
 func _on_mode_changed(mode: StringName) -> void:

@@ -62,10 +62,10 @@ func place_at_cell(cell: Vector2i) -> void:
 func _build_visual() -> void:
 	_spr = Sprite2D.new()
 	var tex: Texture2D = null
-	# Prefer imported texture; fall back to raw image if import hasn't caught up.
+	# Prefer imported texture. Skip filesystem fallback on web — it can hang.
 	if ResourceLoader.exists(WALK_TEX):
 		tex = load(WALK_TEX) as Texture2D
-	if tex == null:
+	if tex == null and not OS.has_feature("web"):
 		var img := Image.load_from_file(ProjectSettings.globalize_path(WALK_TEX))
 		if img != null:
 			tex = ImageTexture.create_from_image(img)

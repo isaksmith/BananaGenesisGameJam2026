@@ -14,6 +14,12 @@ A comedy monkey-civilization jam game built in **Godot 4.7**. Explore a jungle h
 godot --path .
 ```
 
+If Godot fails with missing class names (`WheelLevels`, `GameAudio`, etc.), regenerate the import cache once:
+
+```bash
+godot --path . --import
+```
+
 ## Controls
 
 | Action | Keys |
@@ -43,10 +49,11 @@ Draw your own wheel shape, then race across themed courses such as Gap Gorge, Ne
 ```
 scenes/          Hub, minigames, UI
 scripts/         Gameplay logic
-assets/sprites/  Characters, platforms, shrine art
+assets/sprites/  Characters, platforms, shrine art, web background stills
 assets/audio/    Hub + trail music, SFX
-assets/video/    Hub / defense / maze background loops
+assets/video/    Hub / defense / maze background loops (desktop)
 assets/credits/  Third-party asset credits
+builds/web/      HTML5 export output
 ```
 
 ## Credits
@@ -55,14 +62,20 @@ Third-party itch.io / FreePixel / Kenney assets are listed in [`assets/credits/I
 
 ## Play online (itch.io)
 
-A browser build is exported with Godot’s **Web** preset (single-threaded, Compatibility/WebGL):
+A browser build is exported with Godot’s **Web** preset (single-threaded; no SharedArrayBuffer required):
 
 1. In Godot: **Project → Export → Web → Export Project**  
    (preset is saved in `export_presets.cfg`; output goes to `builds/web/`).
 2. Zip the **contents** of `builds/web/` so `index.html` is at the zip root  
-   (also produced as `builds/banana-genesis-web.zip`).
+   (also produced as `builds/banana-genesis-web.zip` / Desktop copy).
 3. On [itch.io](https://itch.io/game/new): create a project → **Kind: HTML** → upload the zip → enable **This file will be played in the browser**.
 4. Viewport size: **1280 × 720**. Pricing: **No payments / free**.
+
+### Web vs desktop backgrounds
+
+Godot’s Theora `VideoStreamPlayer` is unreliable in the HTML5 export and can freeze or crash the tab. The web build therefore uses high-resolution stills captured from the same background videos (`*_background_still.png` / `hub_background_still.png`). Desktop keeps the looping `.ogv` backgrounds.
+
+Video files (`*.ogv`, `*.mp4`, `*.webm`) are excluded from the web pack via `export_presets.cfg`.
 
 ## License
 
