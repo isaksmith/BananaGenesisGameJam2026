@@ -341,8 +341,9 @@ const LEVELS := {
 		"title": "Mushroom Grove",
 		"blurb": "Magic shrooms hop toward you — bump one for a rainbow trip.",
 		"icon": "res://assets/sprites/portal_icons/mushroom_grove.png",
-		"sky": Color(0.55, 0.42, 0.72),
-		"ground": Color(0.38, 0.28, 0.48),
+		# Match the cyan night mist in the mushroom backdrop art (not a purple sheet).
+		"sky": Color(0.12, 0.28, 0.48),
+		"ground": Color(0.34, 0.42, 0.28),
 		"seed": 1010,
 		"course_length": 8200.0,
 		"scroll_speed": 98.0,

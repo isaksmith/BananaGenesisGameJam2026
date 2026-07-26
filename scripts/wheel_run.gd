@@ -152,15 +152,18 @@ func _apply_level_tuning() -> void:
 
 func _build_world() -> void:
 	_platforms.clear()
-	var sky: Color = _level.get("sky", Color(0.32, 0.58, 0.8)) as Color
-	var bg := Polygon2D.new()
-	bg.z_index = -20
-	bg.color = sky
-	bg.polygon = PackedVector2Array([
-		Vector2(-400, -400), Vector2(course_length + 800, -400),
-		Vector2(course_length + 800, 1000), Vector2(-400, 1000)
-	])
-	add_child(bg)
+	# Flat sky fill shows through backdrop gaps as a color wash — skip for mushroom,
+	# which tiles a full-frame scene with overlap instead.
+	if _theme != &"mushroom":
+		var sky: Color = _level.get("sky", Color(0.32, 0.58, 0.8)) as Color
+		var bg := Polygon2D.new()
+		bg.z_index = -20
+		bg.color = sky
+		bg.polygon = PackedVector2Array([
+			Vector2(-400, -400), Vector2(course_length + 800, -400),
+			Vector2(course_length + 800, 1000), Vector2(-400, 1000)
+		])
+		add_child(bg)
 
 	var winter := _theme == &"winter" or _icy > 0.4
 	match _theme:
@@ -178,9 +181,7 @@ func _build_world() -> void:
 				"sky.png", "earth.png", "back.png", "mid.png", "front.png", "floor.png"
 			], [0.4, 0.5, 0.6, 0.75, 0.88, 0.95], [2200.0, 2600.0, 2400.0, 2000.0, 1800.0, 1600.0])
 		&"mushroom":
-			_build_parallax_backdrop("res://assets/sprites/parallax_mushroom/", [
-				"bg_night.png", "bg_far.png", "bg_mid.png", "bg_near.png"
-			], [0.55, 0.7, 0.85, 0.95], [2400.0, 2100.0, 1800.0, 1500.0])
+			_build_mushroom_backdrop()
 		_:
 			_build_forest_platform_backdrop()
 
@@ -369,6 +370,25 @@ func _build_graveyard_backdrop() -> void:
 			add_child(spr)
 
 
+func _build_mushroom_backdrop() -> void:
+	## Full-frame itch scene — tile with overlap so no flat color wash shows between copies.
+	var tex := load("res://assets/sprites/parallax_mushroom/bg_night.png") as Texture2D
+	if tex == null:
+		return
+	var s := BG_COVER_H / maxf(float(tex.get_height()), 1.0)
+	var spacing := float(tex.get_width()) * s * 0.92
+	var tiles := maxi(8, int(ceil((course_length + 2400.0) / spacing)) + 2)
+	for i in tiles:
+		var spr := Sprite2D.new()
+		spr.z_index = -18
+		spr.texture = tex
+		spr.scale = Vector2(s, s)
+		# Start left of the camera so the first gap is never empty.
+		spr.position = Vector2(-spacing + float(i) * spacing, BG_CENTER_Y)
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(spr)
+
+
 func _build_parallax_backdrop(folder: String, files: Array, alphas: Array, spacings: Array) -> void:
 	for layer_i in files.size():
 		var tex := load(folder + String(files[layer_i])) as Texture2D
@@ -413,11 +433,11 @@ func _tile_desert_platform(body: Node2D, width: float, height: float) -> void:
 
 func _tile_mushroom_platform(body: Node2D, width: float, height: float) -> void:
 	# platform.png is a 1440x480 showcase image — not a tile. Reuse forest caps
-	# with a soft mystic tint so ledges read like the other trails.
+	# with a light moss tint so ledges match the grove scene (no purple slabs).
 	_tile_forest_platform(body, width, height)
 	for child in body.get_children():
 		if child is Sprite2D:
-			(child as Sprite2D).modulate = Color(0.92, 0.8, 1.08, 1)
+			(child as Sprite2D).modulate = Color(0.95, 1.05, 0.92, 1)
 
 
 func _spawn_mushroom_decor(rng: RandomNumberGenerator) -> void:
@@ -877,7 +897,7 @@ func _tile_ground_fill(body: Node2D, width: float, height: float) -> void:
 			tint = Color(1.2, 1.0, 0.72, 1)
 		&"mushroom":
 			path = "res://assets/sprites/ground_dirt_fill.png"
-			tint = Color(0.95, 0.88, 1.0, 1)
+			tint = Color(0.95, 1.0, 0.9, 1)
 		_:
 			path = "res://assets/sprites/ground_dirt_fill.png"
 			tint = Color(1.0, 0.95, 0.85, 1)
