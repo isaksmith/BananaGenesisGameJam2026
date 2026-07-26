@@ -46,7 +46,72 @@ From the **home hub**, walk to a shrine and press **E**:
 
 ### Wheel trails
 
-Draw your own wheel shape, then race across themed courses such as Gap Gorge, Needle Pass, Frost Fjord, Desert Sky, Moon Graveyard, Lunar Void, and Tiger Trail. Wheel size and roundness change jump, grip, and what you can clear.
+Draw your own wheel shape, then race across themed courses such as Gap Gorge, Needle Pass, Frost Fjord, Desert Sky, Moon Graveyard, Lunar Void, Tiger Trail, and Mushroom Grove. Wheel size and roundness change jump, grip, and what you can clear.
+
+## Game flow
+
+```mermaid
+flowchart TD
+    Start([Launch game]) --> Hub[Jungle Hub<br/>explore & pick a shrine]
+
+    Hub -->|E at a side shrine| Chef[Banana Chef<br/>short-order kitchen]
+    Hub -->|E at a side shrine| Defense[Banana Defense<br/>hold off gorillas 30s]
+    Hub -->|E at a side shrine| Maze[Banana Maze<br/>collect bananas, dodge leopard]
+    Hub -->|E at a trail shrine| Draw[Wheel Studio<br/>draw your own wheel]
+
+    Draw --> Trail[Themed trail run<br/>10 courses: Gap Gorge ... Mushroom Grove]
+    Trail -->|Finish line| Cleared{All 10 trails<br/>cleared?}
+    Trail -->|Die / R| Trail
+    Trail -->|Esc / Q| Hub
+
+    Cleared -->|No| Hub
+    Cleared -->|Yes| Win[Ending screen<br/>All Courses Cleared!]
+
+    Chef --> Hub
+    Defense --> Hub
+    Maze --> Hub
+
+    Win -->|Esc / Q| Hub
+    Win -->|R| Reset[Reset campaign] --> Hub
+```
+
+### Trail hazards by theme
+
+Each trail adds its own twist — tumbleweeds roll through Desert Sky, a tiger hunts you on Tiger Trail, and Mushroom Grove spawns hopping shrooms that trigger a rainbow trip overlay when you bump them.
+
+## Technology stack
+
+```mermaid
+flowchart LR
+    subgraph Engine["Godot 4.7 (Forward Plus)"]
+        Scenes["Scenes (.tscn)<br/>hub · minigames · UI"]
+        Scripts["GDScript<br/>gameplay & progress"]
+        Autoloads["Autoloads<br/>GameProgress · GameState<br/>Inventory · AudioSettings · TouchControls"]
+    end
+
+    subgraph Assets["Assets"]
+        Sprites["Pixel sprites<br/>itch.io · FreePixel · Kenney"]
+        Audio["Music + SFX (mp3/ogg)"]
+        Video["Background loops (.ogv)<br/>desktop only"]
+        Stills["High-res stills<br/>web fallback"]
+    end
+
+    subgraph Export["Export targets"]
+        Desktop["Desktop<br/>macOS / Windows / Linux"]
+        Web["Web (HTML5)<br/>single-threaded, no SAB"]
+    end
+
+    Scenes --> Scripts --> Autoloads
+    Sprites --> Scenes
+    Audio --> Scenes
+    Video --> Desktop
+    Stills --> Web
+
+    Engine --> Desktop
+    Engine --> Web
+    Web --> Itch["itch.io<br/>browser build (zip upload)"]
+    Git["Git / GitHub<br/>two remotes"] -.-> Engine
+```
 
 ## Project layout
 
