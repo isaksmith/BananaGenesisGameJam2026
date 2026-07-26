@@ -26,10 +26,31 @@ func _ready() -> void:
 		sound_button.pressed.connect(_on_sound_pressed)
 	if settings_sound_button:
 		settings_sound_button.pressed.connect(_on_sound_pressed)
+	if toggle_hint:
+		# Let the corner hint work as a tap target on mobile.
+		toggle_hint.mouse_filter = Control.MOUSE_FILTER_STOP
+		if not toggle_hint.gui_input.is_connected(_on_toggle_hint_gui):
+			toggle_hint.gui_input.connect(_on_toggle_hint_gui)
 	_build_recipes()
 	_refresh()
 	_refresh_sound_buttons(AudioSettings.sound_enabled)
 	_on_mode_changed(GameProgress.current_mode)
+
+
+func _on_toggle_hint_gui(event: InputEvent) -> void:
+	var tapped := false
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		tapped = true
+	elif event is InputEventScreenTouch and event.pressed:
+		tapped = true
+	if not tapped:
+		return
+	_open = not _open
+	panel.visible = _open
+	dim.visible = _open
+	if _open:
+		_refresh()
+	get_viewport().set_input_as_handled()
 
 
 func _on_sound_pressed() -> void:

@@ -22,12 +22,16 @@ godot --path . --import
 
 ## Controls
 
-| Action | Keys |
-|--------|------|
-| Move | `WASD` / Arrow keys |
-| Jump | `Space` |
-| Interact / Enter shrine | `E` |
-| Exit minigame | `Esc` / `Q` (where enabled) |
+| Action | Keys | Touch (mobile / phone browser) |
+|--------|------|--------------------------------|
+| Move | `WASD` / Arrow keys | Left virtual stick |
+| Jump | `Space` | **JUMP** (wheel trails) |
+| Interact / Enter shrine | `E` | **E** |
+| Exit minigame | `Esc` / `Q` | **EXIT** |
+| Restart trail | `R` | **R** |
+| Recipe book | `C` | **BOOK** / tap `[C] Recipe Book` |
+
+On-screen controls appear automatically on touchscreens (and after the first finger tap on mobile web). Desktop keyboard/mouse is unchanged. Local testing: `godot --path . -- --touch-controls`.
 
 ## Modes
 
@@ -69,7 +73,8 @@ A browser build is exported with Godot’s **Web** preset (single-threaded; no S
 2. Zip the **contents** of `builds/web/` so `index.html` is at the zip root  
    (also produced as `builds/banana-genesis-web.zip` / Desktop copy).
 3. On [itch.io](https://itch.io/game/new): create a project → **Kind: HTML** → upload the zip → enable **This file will be played in the browser**.
-4. Viewport size: **1280 × 720**. Pricing: **No payments / free**.
+4. Viewport size: **1280 × 720** (stretch mode expands for phone aspect ratios). Pricing: **No payments / free**.
+5. Mobile browsers get a virtual stick + action buttons; landscape is recommended.
 
 ### Web vs desktop backgrounds
 
