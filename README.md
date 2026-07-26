@@ -1,8 +1,9 @@
-# Banana Genesis
+# BABOOM - Banana Genesis Mini-Games
 
 A comedy monkey-civilization jam game built in **Godot 4.7**. Explore a jungle hub, enter shrines, invent wheels, cook bananas, defend your stash, and outrun a leopard in the maze.
 
 **Repos:** [BananaGenesisGameJam2026](https://github.com/isaksmith/BananaGenesisGameJam2026)
+**Original:** [GameJam2026](https://github.com/isaksmith/GameJam2026)
 
 ## Run
 
