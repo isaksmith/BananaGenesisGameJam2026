@@ -197,8 +197,19 @@ func _refresh() -> void:
 	var book_open := _recipe_book_open()
 
 	# Drawing studio has its own full-screen drag UI — stay out of the way.
-	if win or wheel_draw or book_open:
+	if wheel_draw or book_open:
 		_set_overlay_visible(false)
+		_clear_stick_input()
+		return
+
+	if win:
+		_set_overlay_visible(true)
+		_stick_pad.visible = false
+		_btn_interact.visible = false
+		_btn_jump.visible = false
+		_btn_craft.visible = false
+		_btn_exit.visible = true
+		_btn_restart.visible = true
 		_clear_stick_input()
 		return
 

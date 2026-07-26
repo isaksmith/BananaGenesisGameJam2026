@@ -81,7 +81,7 @@ theme_override_colors/font_color = Color(1, 0.88, 0.3, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 38
-text = "The Tribe Invents Reinventing"
+text = "All Courses Cleared!"
 horizontal_alignment = 1
 
 [node name="BodyLabel" type="Label" parent="Center/Panel/Margin/VBox"]
@@ -100,5 +100,5 @@ theme_override_colors/font_color = Color(0.85, 0.92, 0.8, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 17
-text = "Press R or Space"
+text = "R = restart campaign · Esc/Q = back to camp"
 horizontal_alignment = 1

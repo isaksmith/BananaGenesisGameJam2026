@@ -31,6 +31,8 @@ var has_wheel: bool = false
 var has_cart: bool = false
 var chase_done: bool = false
 var last_chase_score: int = 0
+## True after every wheel trail has been cleared at least once.
+var campaign_complete: bool = false
 
 ## Selected themed wheel trail (hub level portals).
 var selected_wheel_level: StringName = &"gap_gorge"
@@ -58,6 +60,7 @@ func reset_campaign() -> void:
 	has_cart = false
 	chase_done = false
 	last_chase_score = 0
+	campaign_complete = false
 	drawn_wheel = PackedVector2Array()
 	drawn_wheel_canvas = PackedVector2Array()
 	cleared_wheel_levels.clear()
@@ -220,6 +223,21 @@ func mark_wheel_level_cleared(level_id: StringName = selected_wheel_level) -> vo
 	progress_changed.emit()
 
 
+func all_wheel_trails_cleared() -> bool:
+	var total := WheelLevels.ids().size()
+	if total <= 0:
+		return false
+	return cleared_wheel_levels.size() >= total
+
+
+func cleared_trail_count() -> int:
+	return cleared_wheel_levels.size()
+
+
+func trail_count() -> int:
+	return WheelLevels.ids().size()
+
+
 func load_hub(show_banner: bool = false) -> void:
 	_set_mode(MODE_HUB)
 	if show_banner:
@@ -272,12 +290,21 @@ func complete_minigame(minigame_id: StringName) -> void:
 		MODE_WHEEL:
 			mark_wheel_level_cleared(selected_wheel_level)
 			juice_shake.emit(0.45)
-			era_banner_requested.emit(
-				"%s Cleared!" % WheelLevels.title_of(selected_wheel_level),
-				"Your wheel reinvented reinventing."
-			)
-			await get_tree().create_timer(1.4).timeout
-			load_hub()
+			var trails_done := all_wheel_trails_cleared()
+			if trails_done and not campaign_complete:
+				era_banner_requested.emit(
+					"Every Trail Cleared!",
+					"The jungle has nothing left to teach — for now."
+				)
+				await get_tree().create_timer(1.6).timeout
+				_finish_campaign()
+			else:
+				era_banner_requested.emit(
+					"%s Cleared!" % WheelLevels.title_of(selected_wheel_level),
+					"Your wheel reinvented reinventing."
+				)
+				await get_tree().create_timer(1.4).timeout
+				load_hub()
 		MODE_CART:
 			if not has_cart:
 				has_cart = true
@@ -329,13 +356,20 @@ func shrine_status(minigame_id: StringName) -> String:
 			return "open"
 
 
-func _finish_game() -> void:
+func _finish_campaign() -> void:
+	campaign_complete = true
+	progress_changed.emit()
 	current_mode = MODE_WIN
 	mode_changed.emit(MODE_WIN)
-	game_won.emit(last_chase_score)
+	game_won.emit(cleared_trail_count())
 	if _stage:
 		for child in _stage.get_children():
 			child.queue_free()
+
+
+func _finish_game() -> void:
+	## Legacy alias — campaign ending is trail completion.
+	_finish_campaign()
 
 
 func _set_mode(mode: StringName) -> void:

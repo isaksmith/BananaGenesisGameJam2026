@@ -7,7 +7,14 @@ extends Control
 
 func _ready() -> void:
 	visible = false
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameProgress.game_won.connect(_on_game_won)
+	GameProgress.mode_changed.connect(_on_mode_changed)
+
+
+func _on_mode_changed(mode: StringName) -> void:
+	if mode != GameProgress.MODE_WIN:
+		visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -23,14 +30,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _on_game_won(final_chase_score: int) -> void:
+func _on_game_won(trails_cleared: int) -> void:
 	visible = true
-	title_label.text = "The Tribe Invents Reinventing"
+	move_to_front()
+	var total := maxi(trails_cleared, GameProgress.trail_count())
+	title_label.text = "All Courses Cleared!"
 	body_label.text = (
-		"Bananas defended: %d\n\n"
-		+ "Having reinvented fire, the wheel, and logistics,\n"
+		"Jungle trails conquered: %d / %d\n\n"
+		+ "Having reinvented every wheel the jungle demanded,\n"
 		+ "the monkeys invent the *concept* of reinventing the wheel\n"
 		+ "as a recreational sport.\n\n"
-		+ "They call it a game jam."
-	) % final_chase_score
+		+ "They call it a game jam.\n\n"
+		+ "Chef, Maze, and Defense shrines stay open for fun runs."
+	) % [trails_cleared, total]
 	hint_label.text = "R = restart campaign · Esc/Q = back to camp"

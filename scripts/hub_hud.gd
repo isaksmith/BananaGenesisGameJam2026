@@ -68,6 +68,8 @@ func _refresh_progress() -> void:
 
 
 func _objective_text() -> String:
-	var cleared := GameProgress.cleared_wheel_levels.size()
-	var total := WheelLevels.ids().size()
+	var cleared := GameProgress.cleared_trail_count()
+	var total := GameProgress.trail_count()
+	if GameProgress.campaign_complete or (total > 0 and cleared >= total):
+		return "All %d trails cleared! · side shrines stay open · Esc/Q exits courses" % total
 	return "Explore the jungle · enter a shrine with E · trails %d/%d cleared" % [cleared, total]
