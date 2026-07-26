@@ -8,7 +8,7 @@ A comedy monkey-civilization jam game built in **Godot 4.7**. Explore a jungle h
 
 1. Install [Godot 4.7+](https://godotengine.org/download) (Forward Plus).
 2. Open this folder as a project (`project.godot`).
-3. Press **F5** / Play — main scene is `scenes/main.tscn`.
+3. Press **F5** / Play - main scene is `scenes/main.tscn`.
 
 ```bash
 godot --path .
@@ -35,31 +35,46 @@ On-screen controls appear automatically on touchscreens (and after the first fin
 
 ## Modes
 
-From the **home hub**, walk to a shrine and press **E**:
+From the **home hub**, walk to a shrine and press **E**.
 
-| Shrine | Mode |
-|--------|------|
-| **Banana Chef** | Short-order kitchen — prep, blend, serve banana dishes |
-| **Banana Defense** | Protect the stash from gorilla thieves for 30s (or clear them early) |
-| **Banana Maze** | Collect every banana while a leopard hunts you (3 lives) |
-| **Wheel Trails** | Draw a steering wheel, then ride themed courses in a banana cart |
+### Side minigames
 
-### Wheel trails
+| Shrine | Mode | Goal |
+|--------|------|------|
+| **Banana Chef** | Short-order kitchen | Prep, blend, and serve banana dishes from the recipe book |
+| **Banana Defense** | Stash defense | Protect bananas from gorilla thieves for 30s (or clear them early) |
+| **Banana Maze** | Top-down maze | Collect every banana while a leopard hunts you (3 lives) |
 
-Draw your own wheel shape, then race across themed courses such as Gap Gorge, Needle Pass, Frost Fjord, Desert Sky, Moon Graveyard, Lunar Void, Tiger Trail, and Mushroom Grove. Wheel size and roundness change jump, grip, and what you can clear.
+### Wheel Trails
+
+Draw a steering wheel in the studio, then ride a themed course in a banana cart. Wheel size and roundness change jump, grip, and what you can clear. Clear all **10** trails to unlock the ending screen.
+
+| Trail | Theme | Twist |
+|-------|-------|-------|
+| **Gap Gorge** | Forest | Jump pads and wide chasms - big wheels clear the leaps |
+| **Needle Pass** | Forest | Spike tunnels and saws - tiny wheels fit the ship-lane |
+| **Wobble Ridge** | Forest | Moving platforms and chaos - round wheels hold the line |
+| **Sprint Delta** | Forest | Fast scroll with tight spike rhythm - compact wheels keep up |
+| **Frost Fjord** | Winter / ice | Slippery ice, pads, and frozen saws - round medium wheels grip |
+| **Moon Graveyard** | Graveyard | Stone tombs under a full moon - medium wheels clear the crypt lanes |
+| **Desert Sky** | Desert dunes | Wide gaps and tumbleweeds that roll off ledges into pits |
+| **Lunar Void** | Moonscape | Low-gravity hops between crater lanes - stay compact |
+| **Tiger Trail** | Jungle | A tiger slowly hunts you - keep rolling or get mauled |
+| **Mushroom Grove** | Mushroom forest | Hopping magic shrooms - bump one for a rainbow trip overlay |
 
 ## Game flow
 
 ```mermaid
 flowchart TD
-    Start([Launch game]) --> Hub[Jungle Hub<br/>explore & pick a shrine]
+    Start([Launch game]) --> Hub[Jungle Hub<br/>explore and pick a shrine]
 
-    Hub -->|E at a side shrine| Chef[Banana Chef<br/>short-order kitchen]
-    Hub -->|E at a side shrine| Defense[Banana Defense<br/>hold off gorillas 30s]
-    Hub -->|E at a side shrine| Maze[Banana Maze<br/>collect bananas, dodge leopard]
+    Hub -->|E at Chef shrine| Chef[Banana Chef<br/>short-order kitchen]
+    Hub -->|E at Defense shrine| Defense[Banana Defense<br/>hold off gorillas 30s]
+    Hub -->|E at Maze shrine| Maze[Banana Maze<br/>collect bananas, dodge leopard]
     Hub -->|E at a trail shrine| Draw[Wheel Studio<br/>draw your own wheel]
 
-    Draw --> Trail[Themed trail run<br/>10 courses: Gap Gorge ... Mushroom Grove]
+    Draw --> Trail[Themed trail run<br/>one of 10 courses]
+
     Trail -->|Finish line| Cleared{All 10 trails<br/>cleared?}
     Trail -->|Die / R| Trail
     Trail -->|Esc / Q| Hub
@@ -67,31 +82,27 @@ flowchart TD
     Cleared -->|No| Hub
     Cleared -->|Yes| Win[Ending screen<br/>All Courses Cleared!]
 
-    Chef --> Hub
-    Defense --> Hub
-    Maze --> Hub
+    Chef -->|Esc / Q or complete| Hub
+    Defense -->|Esc / Q or complete| Hub
+    Maze -->|Esc / Q or complete| Hub
 
     Win -->|Esc / Q| Hub
     Win -->|R| Reset[Reset campaign] --> Hub
 ```
-
-### Trail hazards by theme
-
-Each trail adds its own twist — tumbleweeds roll through Desert Sky, a tiger hunts you on Tiger Trail, and Mushroom Grove spawns hopping shrooms that trigger a rainbow trip overlay when you bump them.
 
 ## Technology stack
 
 ```mermaid
 flowchart LR
     subgraph Engine["Godot 4.7 (Forward Plus)"]
-        Scenes["Scenes (.tscn)<br/>hub · minigames · UI"]
-        Scripts["GDScript<br/>gameplay & progress"]
-        Autoloads["Autoloads<br/>GameProgress · GameState<br/>Inventory · AudioSettings · TouchControls"]
+        Scenes["Scenes (.tscn)<br/>hub, minigames, UI"]
+        Scripts["GDScript<br/>gameplay and progress"]
+        Autoloads["Autoloads<br/>GameProgress, GameState<br/>Inventory, AudioSettings, TouchControls"]
     end
 
     subgraph Assets["Assets"]
-        Sprites["Pixel sprites<br/>itch.io · FreePixel · Kenney"]
-        Audio["Music + SFX (mp3/ogg)"]
+        Sprites["Pixel sprites<br/>itch.io, FreePixel, Kenney"]
+        Audio["Music and SFX (mp3/ogg)"]
         Video["Background loops (.ogv)<br/>desktop only"]
         Stills["High-res stills<br/>web fallback"]
     end
@@ -131,7 +142,7 @@ Third-party itch.io / FreePixel / Kenney assets are listed in [`assets/credits/I
 
 ## Play online (itch.io)
 
-A browser build is exported with Godot’s **Web** preset (single-threaded; no SharedArrayBuffer required):
+A browser build is exported with Godot's **Web** preset (single-threaded; no SharedArrayBuffer required):
 
 1. In Godot: **Project → Export → Web → Export Project**  
    (preset is saved in `export_presets.cfg`; output goes to `builds/web/`).
@@ -143,10 +154,10 @@ A browser build is exported with Godot’s **Web** preset (single-threaded; no S
 
 ### Web vs desktop backgrounds
 
-Godot’s Theora `VideoStreamPlayer` is unreliable in the HTML5 export and can freeze or crash the tab. The web build therefore uses high-resolution stills captured from the same background videos (`*_background_still.png` / `hub_background_still.png`). Desktop keeps the looping `.ogv` backgrounds.
+Godot's Theora `VideoStreamPlayer` is unreliable in the HTML5 export and can freeze or crash the tab. The web build therefore uses high-resolution stills captured from the same background videos (`*_background_still.png` / `hub_background_still.png`). Desktop keeps the looping `.ogv` backgrounds.
 
 Video files (`*.ogv`, `*.mp4`, `*.webm`) are excluded from the web pack via `export_presets.cfg`.
 
 ## License
 
-Jam project — see asset credit files for third-party terms. Game code is provided for the jam unless otherwise noted.
+Jam project - see asset credit files for third-party terms. Game code is provided for the jam unless otherwise noted.
