@@ -15,6 +15,7 @@ const ICONS := {
 	&"desert_sky": "res://assets/sprites/hazards/tumbleweed.png",
 	&"lunar_void": "res://assets/sprites/parallax_moon/crescent_moon.png",
 	&"tiger_chase": "res://assets/sprites/tiger/shrine_emblem.png",
+	&"mushroom_grove": "res://assets/sprites/mushroom/shrine_emblem.png",
 }
 
 @export var minigame_id: StringName = &"fire"
@@ -99,6 +100,13 @@ func _apply_theme_pedestal() -> void:
 			pedestal.scale = Vector2(1.15, 1.15)
 			# Same sandy tint used on Desert Sky trail platforms.
 			_pedestal_base_modulate = Color(1.15, 0.95, 0.7, 1)
+		&"mushroom":
+			# The mushroom platform source is a 1440x480 showcase image, not a
+			# shrine-sized tile. Keep the standard trail pedestal footprint.
+			pedestal.texture = _load_texture(FOREST_PLATFORM)
+			pedestal.position = Vector2(0, 20)
+			pedestal.scale = Vector2(1.15, 1.15)
+			_pedestal_base_modulate = Color(0.9, 0.72, 1.08, 1)
 		&"forest":
 			pedestal.texture = _load_texture(FOREST_PLATFORM)
 			pedestal.position = Vector2(0, 20)
@@ -201,6 +209,12 @@ func _setup_art() -> void:
 			icon.position = Vector2(0, -12)
 			icon.scale = Vector2(1.15, 1.15)
 			glow.position = Vector2(0, 8)
+		&"mushroom_grove":
+			icon.position = Vector2(0, -14)
+			# 160px source emblem: scale to the same ~50px footprint as trails.
+			icon.scale = Vector2(0.32, 0.32)
+			glow.position = Vector2(0, 8)
+			glow.color = Color(0.85, 0.45, 1.0, 0.55)
 		&"frost_fjord":
 			icon.position = Vector2(0, -12)
 			icon.scale = Vector2(1.05, 1.05)

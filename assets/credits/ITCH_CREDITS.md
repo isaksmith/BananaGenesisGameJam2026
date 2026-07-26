@@ -31,11 +31,14 @@ Assets used in this jam build (free for personal/commercial use per authors):
 - **Ice Platform** pack (`IcePlatform.zip`) — snow/ice platform tiles, pillars, cubes, and fjord backgrounds for Frost Fjord
 - **Moon Graveyard** ([Anokolisa](https://anokolisa.itch.io/moon-graveyard)) — cemetery tiles, stone platforms, and moonlit backgrounds for Moon Graveyard
 - **Parallax (Forest, desert, sky, moon)** ([Bongseng](https://bongseng.itch.io/parallax-forest-desert-sky-moon)) — desert + lunar parallax layers for Desert Sky and Lunar Void
+- **The Mushroom Forest** ([PIXEL_1992](https://pixel-1992.itch.io/side-scroller-background-mushroom-sprites-the-mushroom-forest)) — mushroom grove parallax backgrounds
+- **Simple Pixel Assets - Mushroom Forest** ([High Garden Games](https://highgardengames.itch.io/pixel-assets-mushroom-forest)) — mushroom sprites, platform tiles, and grove props for Mushroom Grove
 
 ## Hazards
 - **Floor spikes** pack (`floor spikes.zip`) — wood/metal floor spike sprites for wheel courses
 - **Animated Traps** pack (`Traps.zip`, CC0) — spike trap, fire trap, and bear trap animations on wheel courses
 - **Tumbleweed** (`assets/sprites/hazards/tumbleweed.png`) — custom pixel prop for Desert Sky rolling hazards
+- **Hopping mushrooms** — Mushroom Grove chase props from the High Garden Games mushroom pack above
 
 ## Chase enemies
 - **Cat Pixel Animations — Bengal** (TigerCatPaid) — side-view tiger run sheet for Tiger Trail chase

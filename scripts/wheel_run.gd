@@ -58,6 +58,14 @@ var _tiger: Area2D = null
 var _tumbleweeds_enabled: bool = false
 var _tumble_spawn_t: float = 0.0
 var _tumble_spawn_cd: float = 2.8
+var _hop_mushrooms_enabled: bool = false
+var _mushroom_spawn_t: float = 0.0
+var _mushroom_spawn_cd: float = 2.4
+var _trip_rect: ColorRect = null
+var _trip_rect_b: ColorRect = null
+var _trip_intensity: float = 0.0
+var _trip_hold: float = 0.0
+var _trip_hue: float = 0.0
 
 const ROCK_VARIANTS := [
 	"res://assets/sprites/rock_small.png",
@@ -85,12 +93,18 @@ func _ready() -> void:
 	if _tumbleweeds_enabled:
 		_tumble_spawn_t = 1.2
 		_tumble_spawn_cd = float(_level.get("tumbleweed_interval", 2.8))
+	_hop_mushrooms_enabled = _theme == &"mushroom" or bool(_level.get("hop_mushrooms", false))
+	if _hop_mushrooms_enabled:
+		_mushroom_spawn_t = 1.0
+		_mushroom_spawn_cd = float(_level.get("mushroom_interval", 2.4))
 	_build_camera()
 	_build_ui()
 	var title := str(_level.get("title", "Trail"))
 	var tip := "pads launch · spikes kill"
 	if bool(_level.get("chase_tiger", false)):
 		tip = "tiger chases — don't get caught · spikes kill"
+	elif _hop_mushrooms_enabled:
+		tip = "hopping shrooms chase you — bump one for a rainbow trip · spikes kill"
 	elif _tumbleweeds_enabled:
 		tip = "tumbleweeds roll across ledges and fall into gaps — jump them · spikes kill"
 	_hint.text = "%s · %s\n%s\nArrows · Space · Esc/Q · R" % [
@@ -163,6 +177,10 @@ func _build_world() -> void:
 			_build_parallax_backdrop("res://assets/sprites/parallax_moon/", [
 				"sky.png", "earth.png", "back.png", "mid.png", "front.png", "floor.png"
 			], [0.4, 0.5, 0.6, 0.75, 0.88, 0.95], [2200.0, 2600.0, 2400.0, 2000.0, 1800.0, 1600.0])
+		&"mushroom":
+			_build_parallax_backdrop("res://assets/sprites/parallax_mushroom/", [
+				"bg_night.png", "bg_far.png", "bg_mid.png", "bg_near.png"
+			], [0.55, 0.7, 0.85, 0.95], [2400.0, 2100.0, 1800.0, 1500.0])
 		_:
 			_build_forest_platform_backdrop()
 
@@ -239,6 +257,8 @@ func _build_world() -> void:
 			_spawn_graveyard_decor(rng)
 		&"desert":
 			_spawn_desert_tumbleweed_props(rng)
+		&"mushroom":
+			_spawn_mushroom_decor(rng)
 		&"lunar":
 			pass
 		_:
@@ -389,6 +409,61 @@ func _tile_desert_platform(body: Node2D, width: float, height: float) -> void:
 	for child in body.get_children():
 		if child is Sprite2D:
 			(child as Sprite2D).modulate = Color(1.15, 0.95, 0.7, 1)
+
+
+func _tile_mushroom_platform(body: Node2D, width: float, height: float) -> void:
+	# platform.png is a 1440x480 showcase image — not a tile. Reuse forest caps
+	# with a soft mystic tint so ledges read like the other trails.
+	_tile_forest_platform(body, width, height)
+	for child in body.get_children():
+		if child is Sprite2D:
+			(child as Sprite2D).modulate = Color(0.92, 0.8, 1.08, 1)
+
+
+func _spawn_mushroom_decor(rng: RandomNumberGenerator) -> void:
+	var grounds := _plats_ground()
+	var airs := _plats_air()
+	var plats: Array[Dictionary] = []
+	plats.append_array(grounds)
+	plats.append_array(airs)
+	if plats.is_empty():
+		return
+	plats.shuffle()
+	var tree_tex := load("res://assets/sprites/mushroom/tree.png") as Texture2D
+	var static_mush := [
+		"res://assets/sprites/mushroom/Mushrooms64x65.png",
+		"res://assets/sprites/mushroom/Mushrooms64x68.png",
+		"res://assets/sprites/mushroom/Mushrooms64x72.png",
+		"res://assets/sprites/mushroom/Mushrooms64x76.png",
+		"res://assets/sprites/mushroom/Mushrooms64x80.png",
+	]
+	var n := mini(plats.size(), 28)
+	for i in n:
+		var p: Dictionary = plats[i]
+		if i % 5 == 0 and tree_tex != null:
+			var spr := Sprite2D.new()
+			spr.texture = tree_tex
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			var s := rng.randf_range(0.35, 0.55)
+			spr.scale = Vector2(s, s)
+			spr.z_index = -1
+			spr.position = _plat_point(p, rng.randf_range(0.2, 0.8)) + Vector2(0, -2)
+			spr.offset = Vector2(0, -float(tree_tex.get_height()) * 0.5)
+			add_child(spr)
+		else:
+			var path: String = static_mush[rng.randi() % static_mush.size()]
+			var tex := load(path) as Texture2D
+			if tex == null:
+				continue
+			var spr := Sprite2D.new()
+			spr.texture = tex
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			var s := rng.randf_range(0.7, 1.05)
+			spr.scale = Vector2(s, s)
+			spr.z_index = 1
+			spr.position = _plat_point(p, rng.randf_range(0.15, 0.85)) + Vector2(0, -2)
+			spr.offset = Vector2(0, -float(tex.get_height()) * 0.5)
+			add_child(spr)
 
 
 func _spawn_graveyard_decor(rng: RandomNumberGenerator) -> void:
@@ -714,6 +789,8 @@ func _add_ground(x: float, y: float, width: float, height: float) -> void:
 		_tile_graveyard_platform(body, width, height)
 	elif _theme == &"desert":
 		_tile_desert_platform(body, width, height)
+	elif _theme == &"mushroom":
+		_tile_mushroom_platform(body, width, height)
 	else:
 		_tile_forest_platform(body, width, height)
 
@@ -798,6 +875,9 @@ func _tile_ground_fill(body: Node2D, width: float, height: float) -> void:
 		&"desert":
 			path = "res://assets/sprites/ground_dirt_fill.png"
 			tint = Color(1.2, 1.0, 0.72, 1)
+		&"mushroom":
+			path = "res://assets/sprites/ground_dirt_fill.png"
+			tint = Color(0.95, 0.88, 1.0, 1)
 		_:
 			path = "res://assets/sprites/ground_dirt_fill.png"
 			tint = Color(1.0, 0.95, 0.85, 1)
@@ -882,6 +962,11 @@ func _theme_floating_rock_paths() -> Array[String]:
 			return [
 				"res://assets/sprites/rock_piles/pile8_azure.png",
 				"res://assets/sprites/rock_piles/pile8_silver.png",
+			]
+		&"mushroom":
+			return [
+				"res://assets/sprites/rock_piles/pile8_silver.png",
+				"res://assets/sprites/rock_piles/pile8_mossy.png",
 			]
 		_:
 			# Forest / tiger jungle trails
@@ -1485,6 +1570,12 @@ func _clear_tumbleweeds() -> void:
 			n.queue_free()
 
 
+func _clear_hop_mushrooms() -> void:
+	for n in get_tree().get_nodes_in_group("hop_mushroom"):
+		if is_instance_valid(n):
+			n.queue_free()
+
+
 func _spawn_rolling_tumbleweed() -> void:
 	if _camera == null:
 		return
@@ -1493,12 +1584,25 @@ func _spawn_rolling_tumbleweed() -> void:
 	weed.set_script(script)
 	var speed := float(_level.get("tumbleweed_speed", 68.0)) * randf_range(0.85, 1.15)
 	var scale_mul := randf_range(0.75, 1.05)
-	weed.global_position = _pick_tumbleweed_spawn()
+	weed.global_position = _pick_ahead_platform_spawn(70.0)
 	add_child(weed)
 	weed.call("setup", _on_hazard, speed, scale_mul)
 
 
-func _pick_tumbleweed_spawn() -> Vector2:
+func _spawn_hop_mushroom() -> void:
+	if _camera == null or _wheel == null:
+		return
+	var script: Script = load("res://scripts/hop_mushroom.gd") as Script
+	var shroom := CharacterBody2D.new()
+	shroom.set_script(script)
+	var speed := float(_level.get("mushroom_speed", 100.0)) * randf_range(0.85, 1.2)
+	var scale_mul := randf_range(0.85, 1.1)
+	shroom.global_position = _pick_ahead_platform_spawn(60.0)
+	add_child(shroom)
+	shroom.call("setup", _on_mushroom_hit, _wheel, speed, scale_mul)
+
+
+func _pick_ahead_platform_spawn(min_width: float = 70.0) -> Vector2:
 	## Prefer a platform under the right side of the camera at any lane height.
 	var x_min := _scroll_x + 420.0
 	var x_max := _scroll_x + 780.0
@@ -1508,24 +1612,62 @@ func _pick_tumbleweed_spawn() -> Vector2:
 		var right := float(p["right"])
 		if right < x_min or left > x_max:
 			continue
-		# Need a little runway so they can roll before falling.
-		if float(p["w"]) < 70.0:
+		if float(p["w"]) < min_width:
 			continue
 		candidates.append(p)
 
 	if candidates.is_empty():
-		# Fallback: drop in from the right and let gravity find a ledge.
 		return Vector2(_scroll_x + 720.0, float(_level.get("lane_mid_y", 335.0)))
 
 	var plat: Dictionary = candidates[randi() % candidates.size()]
 	var left := float(plat["left"])
 	var right := float(plat["right"])
-	# Bias toward the right edge so they enter from off-screen / far right.
 	var t := randf_range(0.55, 0.95)
 	var x := lerpf(left + 18.0, right - 14.0, t)
 	x = clampf(x, left + 14.0, right - 10.0)
 	var top := float(plat["top"])
-	return Vector2(x, top - 10.0)
+	return Vector2(x, top - 12.0)
+
+
+func _on_mushroom_hit(body: Node2D, _shroom: Node) -> void:
+	if _done or _dead:
+		return
+	if body != _wheel and not body.is_in_group("player"):
+		return
+	_trip_hold = maxf(_trip_hold, 3.4)
+	_trip_intensity = maxf(_trip_intensity, 0.8)
+	_apply_trip_visual()
+	GameProgress.juice_shake.emit(0.12)
+	_hint.text = "Whoa… rainbow waves! Ride it out — spikes still kill."
+
+
+func _update_trip(delta: float) -> void:
+	if _trip_rect == null:
+		return
+	if _trip_hold > 0.0:
+		_trip_hold -= delta
+		_trip_intensity = move_toward(_trip_intensity, 0.95, delta * 1.2)
+	else:
+		_trip_intensity = move_toward(_trip_intensity, 0.0, delta * 0.7)
+	_trip_hue = fmod(_trip_hue + delta * 0.55, 1.0)
+	_apply_trip_visual()
+
+
+func _apply_trip_visual() -> void:
+	if _trip_rect == null:
+		return
+	var on := _trip_intensity > 0.02
+	_trip_rect.visible = on
+	if _trip_rect_b:
+		_trip_rect_b.visible = on
+	if not on:
+		return
+	# No shader — plain translucent ColorRects. Safe on Metal / all backends.
+	var pulse := 0.5 + 0.5 * sin(_time * 7.0)
+	var a := clampf(0.16 + 0.22 * _trip_intensity * (0.75 + 0.25 * pulse), 0.0, 0.42)
+	_trip_rect.color = Color.from_hsv(_trip_hue, 0.75, 1.0, a)
+	if _trip_rect_b:
+		_trip_rect_b.color = Color.from_hsv(fmod(_trip_hue + 0.33, 1.0), 0.7, 1.0, a * 0.65)
 
 
 func _spawn_finish() -> void:
@@ -1603,6 +1745,7 @@ func _build_camera() -> void:
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
+	layer.layer = 20
 	add_child(layer)
 	_hint = Label.new()
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1626,6 +1769,34 @@ func _build_ui() -> void:
 	_status.add_theme_color_override("font_outline_color", Color.BLACK)
 	_status.add_theme_constant_override("outline_size", 4)
 	layer.add_child(_status)
+	if _hop_mushrooms_enabled:
+		# Own layer above the world, below/with UI sibling ordering handled by layer index.
+		_build_trip_overlay()
+
+
+func _build_trip_overlay() -> void:
+	var trip_layer := CanvasLayer.new()
+	trip_layer.name = "TripLayer"
+	# Above the world, under the HUD labels (HUD is layer 20).
+	trip_layer.layer = 15
+	add_child(trip_layer)
+
+	# Shader-free translucent wash — ColorRect.color alpha is what you see.
+	_trip_rect = ColorRect.new()
+	_trip_rect.name = "TripOverlay"
+	_trip_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_trip_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trip_rect.color = Color(1, 0, 1, 0.0)
+	_trip_rect.visible = false
+	trip_layer.add_child(_trip_rect)
+
+	_trip_rect_b = ColorRect.new()
+	_trip_rect_b.name = "TripOverlayB"
+	_trip_rect_b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_trip_rect_b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trip_rect_b.color = Color(0, 1, 1, 0.0)
+	_trip_rect_b.visible = false
+	trip_layer.add_child(_trip_rect_b)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1714,6 +1885,13 @@ func _physics_process(delta: float) -> void:
 			_spawn_rolling_tumbleweed()
 			_tumble_spawn_t = _tumble_spawn_cd * randf_range(0.75, 1.35)
 
+	if _hop_mushrooms_enabled:
+		_mushroom_spawn_t -= delta
+		if _mushroom_spawn_t <= 0.0:
+			_spawn_hop_mushroom()
+			_mushroom_spawn_t = _mushroom_spawn_cd * randf_range(0.7, 1.3)
+		_update_trip(delta)
+
 	# Soft right rail — always past the finish so the player can cross it.
 	var right_limit := maxf(_scroll_x + 560.0, _finish_x + 80.0)
 	if _wheel.global_position.x > right_limit:
@@ -1786,6 +1964,10 @@ func _respawn(msg: String) -> void:
 	if _tiger != null and is_instance_valid(_tiger):
 		_tiger.call("set_active", false)
 	_clear_tumbleweeds()
+	_clear_hop_mushrooms()
+	_trip_hold = 0.0
+	_trip_intensity = 0.0
+	_apply_trip_visual()
 	if _visual:
 		_visual.visible = false
 	_spawn_banana_explosion(boom_at)
@@ -1797,6 +1979,7 @@ func _respawn(msg: String) -> void:
 	_wheel.velocity = Vector2.ZERO
 	_roll_dist = 0.0
 	_tumble_spawn_t = 1.6
+	_mushroom_spawn_t = 1.2
 	if _tiger != null and is_instance_valid(_tiger):
 		_tiger.global_position = _spawn + Vector2(-220.0, 20.0)
 		_tiger.call("set_active", true)
