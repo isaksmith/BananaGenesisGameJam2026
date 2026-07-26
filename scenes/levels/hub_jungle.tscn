@@ -195,7 +195,7 @@ script = ExtResource("6_climb")
 shape = SubResource("RectangleShape2D_climb")
 
 [node name="Monkey" parent="." instance=ExtResource("2_monkey")]
-position = Vector2(640, 520)
+position = Vector2(420, 508)
 
 [node name="Pickups" type="Node2D" parent="."]
 
